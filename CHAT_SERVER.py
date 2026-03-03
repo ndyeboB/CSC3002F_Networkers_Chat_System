@@ -5,7 +5,7 @@ import threading
 HOST = "0.0.0.0"
 PORT = 1234 # the range of use is 0 to 65535
 
-CLIENT_LIMIT = 100 # lets set a limit on the amount of people that can be a chat -- later we can build more capacity in our system
+CLIENT_LIMIT = 5 # lets set a limit on the amount of people that can be a chat -- later we can build more capacity in our system
 
 online_clients = [] # list of all clients that are curently online and connected to the server
 
@@ -51,7 +51,7 @@ def server_listening(client, username): # responsible of collecting the message
 # this is to send a message to a single client
 # needs to be further implemented so the client can choose who to send a message to with peer to peer
 def lets_send_message_to_client(client, message):
-    client.sendall(message.encode) # client = receiving client
+    client.sendall(message.encode()) # client = receiving client
 
 # needs to be further implemented so we first initiate a seperate group chat to send to everyone
 def lets_send_message_to_everyone(message): 
@@ -69,6 +69,7 @@ def main():
     try:
         # attach the server with an address in the form of host IP and port
         server.bind((HOST, PORT))
+        print(f"Running the server on {HOST} {PORT}")
         
 
     except:
@@ -76,7 +77,7 @@ def main():
 
 
     server.listen(CLIENT_LIMIT)
-    print(f"The server on {HOST} {PORT} is listening for a connection...")
+    print("The server is listening for a connection...")
     
     # this while loop will keep listening to client connections
     while True:
