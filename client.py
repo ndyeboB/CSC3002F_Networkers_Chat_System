@@ -17,25 +17,25 @@ def listeningForMessages(client):
                print(f"[{userID}] {messageContent}")
                
           else:
-               print("message is empty")
+               print("Message is empty!")
 
 def send_message(client):
     # This function allows the user to type messages and send them to the server.
     while True:
-         message = input("message:")
+         message = input("Message: ")
          if message != '':
               client.sendall(message.encode())
          else:
-              print("empty message")
+              print("Empty message!")
               exit(0)
 
 def server_communication(client):
 #Handles initial communication with the server, including sending the userID and starting the listening thread.
-     userID = input("Enter userID:")
+     userID = input("Enter userID: ")
      if userID != '':
           client.sendall(userID.encode())
      else:
-          print("Invalid: userID cannot be empty")
+          print("Invalid: UserID cannot be empty")
           exit(0)
      #start the listening thread
      threading.Thread(target=listeningForMessages, args=(client, )).start()
@@ -53,9 +53,9 @@ def main():
      #connect to the server(TCP connection)
      try:
           client.connect((HOST, PORT))
-          print("connection is successful")
+          print("Connection is successful!")
      except:
-          print(f"connection is unsuccessful")
+          print(f"Connection is unsuccessful!")
 
      server_communication(client)
 

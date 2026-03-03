@@ -50,7 +50,7 @@ def server_listening(client, username): # responsible of collecting the message
 # this is to send a message to a single client
 # needs to be further implemented so the client can choose who to send a message to with peer to peer
 def lets_send_message_to_client(client, message):
-    client.sendall(message.encode) # client = receiving client
+    client.sendall(message.encode()) # client = receiving client
 
 # needs to be further implemented so we first initiate a seperate group chat to send to everyone
 def lets_send_message_to_everyone(message): 
