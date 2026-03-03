@@ -65,7 +65,7 @@ def main():
     try:
         # provide the server with an address in the form of host IP and port
         server.bind((HOST, PORT))
-        print(f"We have initiated the server on {HOST} {PORT} and it is running!")
+        print(f"The server on {HOST} {PORT} is listening for a connection...")
 
     except:
         print(f"ERROR! The server cannot bind to host: {HOST} and port: {PORT}. Please try again!")
@@ -75,7 +75,8 @@ def main():
     
     # this while loop will keep listening to client connections
     while True:
-        client, address = server.accept() 
+        client, address = server.accept() # client = represents the client who has connected
+        # address = represents where the client is sending from
         print(f"Successfully connected to client: {address[0]} {address[1]}")
     
 
