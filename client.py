@@ -6,15 +6,15 @@ import threading
 HOST = '0.0.0.0 '   #Server IP address (IPv4)
 PORT = 1234              #Port number the server is listening on
 
-def listeningForMessages(client):
+def listening_For_Messages(client):
 # This function continously listens for incoming messages from the server. It runs on a separate thread so that the client can send and receive messages simultaneously.
      while True:
           message = client.recv(2048).decode('utf-8')
           if message != '':
                userID = message.split(":")[0]
-               messageContent = message.split(':')[1]
+               messageContent = message.split(":")[1]
 
-               print(f"[{userID}] {messageContent}")
+               print(f"[{userID}]: {messageContent}")
                
           else:
                print("Message is empty!")
@@ -31,14 +31,14 @@ def send_message(client):
 
 def server_communication(client):
 #Handles initial communication with the server, including sending the userID and starting the listening thread.
-     userID = input("Enter userID: ")
+     userID = input("Login..\nEnter userID: ")
      if userID != '':
           client.sendall(userID.encode())
      else:
           print("Invalid: UserID cannot be empty")
           exit(0)
      #start the listening thread
-     threading.Thread(target=listeningForMessages, args=(client, )).start()
+     threading.Thread(target=listening_For_Messages, args=(client, )).start()
   
      # main thread that handles sending messages
      send_message(client)
@@ -53,9 +53,9 @@ def main():
      #connect to the server(TCP connection)
      try:
           client.connect((HOST, PORT))
-          print("Connection is successful!")
+          print(f"Connection is successful to server: {HOST} {PORT}!")
      except:
-          print(f"Connection is unsuccessful!")
+          print("Connection is unsuccessful!")
 
      server_communication(client)
 

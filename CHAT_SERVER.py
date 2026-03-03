@@ -5,7 +5,7 @@ import threading
 HOST = "0.0.0.0"
 PORT = 1234 # the range of use is 0 to 65535
 
-CLIENT_LIMIT = 100 # lets set a limit on the amount of people that can be a chat -- later we can build more capacity in our system
+CLIENT_LIMIT = 5 # lets set a limit on the amount of people that can be a chat -- later we can build more capacity in our system
 
 online_clients = [] # list of all clients that are curently online and connected to the server
 
@@ -68,6 +68,7 @@ def main():
     try:
         # attach the server with an address in the form of host IP and port
         server.bind((HOST, PORT))
+        print(f"Running the server on {HOST} {PORT}")
         
 
     except:
@@ -75,7 +76,7 @@ def main():
 
 
     server.listen(CLIENT_LIMIT)
-    print(f"The server on {HOST} {PORT} is listening for a connection...")
+    print("The server is listening for a connection...")
     
     # this while loop will keep listening to client connections
     while True:
