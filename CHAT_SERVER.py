@@ -26,7 +26,10 @@ def work_with_client(client):
             break
         else:
             print("The username given by the client is empty!")
-
+    # this CREATES a NEW THREAD
+    # that thread runs server_listening
+    # SO EACH CLIENT HAS ITS OWN LOOP!!!!!
+    # without this 1 client could talk but with it each client runs indepedently
     threading.Thread(target=server_listening, args=(client, username, )).start()
 
 
@@ -37,7 +40,7 @@ def server_listening(client, username): # responsible of collecting the message
         message = client.recv(2048).decode('utf-8') # listens for the message that the client wants to send
 
         if message !='':
-            main_message = username + ': ' + message
+            main_message = username + ':' + message
             lets_send_message_to_everyone(main_message)
 
         else:
@@ -63,23 +66,24 @@ def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # we are using TCP
 
     try:
-        # provide the server with an address in the form of host IP and port
+        # attach the server with an address in the form of host IP and port
         server.bind((HOST, PORT))
-        print(f"The server on {HOST} {PORT} is listening for a connection...")
+        
 
     except:
         print(f"ERROR! The server cannot bind to host: {HOST} and port: {PORT}. Please try again!")
 
 
     server.listen(CLIENT_LIMIT)
+    print(f"The server on {HOST} {PORT} is listening for a connection...")
     
     # this while loop will keep listening to client connections
     while True:
-        client, address = server.accept() # client = represents the client who has connected
-        # address = represents where the client is sending from
+        client, address = server.accept() # client = client socket
+        # address = represents where client comes from
         print(f"Successfully connected to client: {address[0]} {address[1]}")
     
-
+        
         threading.Thread(target=work_with_client, args=(client,)).start()  
 
 if __name__ == '__main__':
