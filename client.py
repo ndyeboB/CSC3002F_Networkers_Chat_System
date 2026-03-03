@@ -3,7 +3,7 @@
 import socket
 import threading
 
-HOST = '196.24.130.36'  #Blessings laptop server
+HOST = '196.24.182.15'  # relative laptop server
 PORT = 1234
 
 #Main function
