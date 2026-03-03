@@ -21,6 +21,7 @@ def work_with_client(client):
         if username != '':
             online_clients.append((username, client)) # we add the client to list
             entry_message = "Server: "+f"{username} has entered the chat system!"
+      
             lets_send_message_to_everyone(entry_message) 
             # when a new user is added to the chat, every one else is notified
             break
