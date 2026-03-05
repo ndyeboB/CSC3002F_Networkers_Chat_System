@@ -1,11 +1,21 @@
 import socket
 import threading
+import CHAT_SERVER
 
 hostIP = "0.0.0.0"
 port= 2357
 
 def sendMessage(client, message):
     client.sendall(message.encode()) # client = receiving client
+
+def writeMessage(client, message):
+    while True:
+        message = input("Message: ")
+        if message != "":
+            client.sendall(message.encode())
+        else:
+            print("Empty message!")
+            exit(0)
 
 def connectPeer(client):
     while True:
@@ -30,19 +40,22 @@ def listen(client, username):
     
 
 def main():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # we are using TCP
-    try:
-        # attach the server with an address in the form of host IP and port
-        server.bind((hostIP,port))
-        
-    except:
-        print(f"ERROR! The server cannot bind to host: {hostIP} and port: {port}. Please try again!")
-
-    server.listen()
+    server =socket.socket(socket.AF_INET, socket.SOCK_STREAM) # we are using TCP
+    client= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
     #print(f"The server on {hostIP} {port} is listening for a connection...")
-    initiator = input("Would you like to initiate a conversation? (yes/no)").lower()
+    initiator = input("Would you like to initiate a conversation (yes/no)?\n").lower()
 
     if initiator == "no":
+        print("Waiting for initiator...")
+        try:
+        # attach the server with an address in the form of host IP and port
+            server.bind((hostIP,port))
+
+        except:
+            print(f"ERROR! The server cannot bind to host: {hostIP} and port: {port}. Please try again!")
+            
+        server.listen()
         while True:
             connection, address = server.accept()
             print(f"Successfully connected to peer: {address[0]} {address[1]}")
@@ -50,8 +63,17 @@ def main():
 
     elif initiator == "yes":
         connectTo= input("Enter the username of the person you want to connect to?")
-        for x in CHAT_SERVER.online_user:
-            
+        for x in CHAT_SERVER.online_clients:
+            if connectTo == CHAT_SERVER.online_clients[x][0]:
+                userHost= CHAT_SERVER.online_clients[x][1][0]
+                userPort = CHAT_SERVER.online_clients[x][1][1]
+                try:
+                    client.connect((userHost,userPort))
+                    print(f"Connection is successful to peer: {userHost}:{userPort}!")
+                except:
+                    print("Connection is unsuccessful, Try again!")
+        threading.Thread(target=listen, args= (client,)).start()
+        writeMessage(client)
 
     else:
         print("Enter 'yes' or 'no'")
