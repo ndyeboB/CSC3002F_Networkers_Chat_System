@@ -3,7 +3,7 @@
 import socket
 import threading
 
-HOST = '0.0.0.0 '   #Server IP address (IPv4)
+HOST = '196.24.130.36 -'   #Server IP address (IPv4)
 PORT = 1234              #Port number the server is listening on
 
 def listeningForMessages(client):
