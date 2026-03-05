@@ -1,13 +1,10 @@
 #Testing client-server connection
 
+import CHAT_SERVER
 import socket
 import threading
 
-<<<<<<< HEAD
-HOST = '196.24.130.36 -'   #Server IP address (IPv4)
-=======
 HOST = '127.0.0.1'   #Server IP address (IPv4)
->>>>>>> b8daa0f4e2d7f87faabb3985d297fcb62c23c97a
 PORT = 1234              #Port number the server is listening on
 
 
@@ -79,7 +76,10 @@ def interface_menu(client):
                client.sendall(choice.encode())
 
                if choice == "4":
-                    break
+                    for user in CHAT_SERVER.online_clients:
+                         username = user[0]
+                         print("Goodbye {username}! Hope to see you soon!")
+                         break
 
           elif choice == "3":
                send_group_message(client) # we need to make a function that allows messaging
@@ -95,6 +95,7 @@ def send_group_message(client):
           message = input() # you write
 
           if message.lower() == 'return': # exit
+               client.sendall("EXITING".encode())
                break
           if message != "":
                client.sendall(message.encode())
