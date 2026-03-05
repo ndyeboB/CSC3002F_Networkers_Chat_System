@@ -3,7 +3,11 @@
 import socket
 import threading
 
+<<<<<<< HEAD
+HOST = '196.24.130.36 -'   #Server IP address (IPv4)
+=======
 HOST = '127.0.0.1'   #Server IP address (IPv4)
+>>>>>>> b8daa0f4e2d7f87faabb3985d297fcb62c23c97a
 PORT = 1234              #Port number the server is listening on
 
 
