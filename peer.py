@@ -38,7 +38,7 @@ def listen(client, username):
     else:
         print(f"The message sent from client: {username} is empty. Please try again.")
     
-
+@staticmethod
 def main():
     server =socket.socket(socket.AF_INET, socket.SOCK_STREAM) # we are using TCP
     client= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -54,7 +54,7 @@ def main():
 
         except:
             print(f"ERROR! The server cannot bind to host: {hostIP} and port: {port}. Please try again!")
-            
+
         server.listen()
         while True:
             connection, address = server.accept()
