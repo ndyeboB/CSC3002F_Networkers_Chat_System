@@ -35,7 +35,7 @@ def work_with_client(client):
             CHAT_SERVER.online_clients.append((username, client)) # we add the client to list
             
             client.send("ACK:Login successful!\n".encode()) # we tell the client login is successful!
-            entry_message = "SERVER: "+f"{username} has entered the chat system!\n"
+            entry_message = "SERVER: "+f"{username} has entered the chat system!"
             lets_send_message_to_everyone(entry_message, exclude_username=username) 
             # when a new user is added to the chat, every one else is notified
             break
@@ -57,6 +57,10 @@ def server_listening(client, username): # responsible of collecting the message
             #main_message = username + ':' + message
             #lets_send_message_to_everyone(main_message)
             continue
+
+        if message == "EXITING":
+            grp_broadcast = "SERVER: "+f"{username} has left the default group. Goodbye {username}!"
+            lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
 
         # Choice 1: Connect to friend (peer)
         if message == "1":
@@ -83,6 +87,8 @@ def server_listening(client, username): # responsible of collecting the message
         else:
             if username in groups["default"]:
                 group_message = f"{username}: {message}"
+                grp_broadcast = "SERVER: "+f"{username} has entered the default group!"
+                lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
                 send_to_default_group(group_message)
             else:
                 client.send("SERVER:Join the default group first (option 2)".encode())
@@ -103,7 +109,7 @@ def lets_send_message_to_everyone(message, exclude_username=None):
         
 
 def send_to_default_group(message):
-    for user in online_clients:
+    for user in CHAT_SERVER.online_clients:
         username = user[0]
         client_socket = user[1]
 
