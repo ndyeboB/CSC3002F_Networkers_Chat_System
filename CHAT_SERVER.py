@@ -35,7 +35,7 @@ def work_with_client(client):
             CHAT_SERVER.online_clients.append((username, client)) # we add the client to list
             
             client.send("ACK:Login successful!\n".encode()) # we tell the client login is successful!
-            entry_message = "SERVER: "+f"{username} has entered the chat system!\n"
+            entry_message = "SERVER: "+f"{username} has entered the chat system!"
             lets_send_message_to_everyone(entry_message, exclude_username=username) 
             # when a new user is added to the chat, every one else is notified
             break
@@ -103,7 +103,7 @@ def lets_send_message_to_everyone(message, exclude_username=None):
         
 
 def send_to_default_group(message):
-    for user in online_clients:
+    for user in CHAT_SERVER.online_clients:
         username = user[0]
         client_socket = user[1]
 
