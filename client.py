@@ -51,6 +51,8 @@ def server_communication(client):
                print(receiving_msg) # we take the server response
                if receiving_msg.startswith("ACK"): # if the server ACKnowledged username succes
                     break
+               else:
+                    print("Try again with another username!")
           else:
                print("Invalid: UserID cannot be empty")
                
@@ -92,7 +94,7 @@ def send_group_message(client):
      while True:
           message = input() # you write
 
-          if message.lower() == 'back': # exit
+          if message.lower() == 'return': # exit
                break
           if message != "":
                client.sendall(message.encode())

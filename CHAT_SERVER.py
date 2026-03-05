@@ -7,7 +7,8 @@ PORT = 1234 # the range of use is 0 to 65535
 
 CLIENT_LIMIT = 5 # lets set a limit on the amount of people that can be a chat -- later we can build more capacity in our system
 
-online_clients = [] # list of all clients that are curently online and connected to the server
+class CHAT_SERVER:
+    online_clients = [] # list of all clients that are curently online and connected to the server
 
 groups = {"default": []} # default group just to show group chat demonstartion
 
@@ -24,14 +25,14 @@ def work_with_client(client):
 
 
         username_used = False
-        for user in online_clients: # loop in the online_list to check if username already exists
+        for user in CHAT_SERVER.online_clients: # loop in the online_list to check if username already exists
             if user[0] == username:
                 username_used = True
                 break
         if username_used: # if the username has been found
             client.send("ERROR:Username has been already taken".encode())
         else:
-            online_clients.append((username, client)) # we add the client to list
+            CHAT_SERVER.online_clients.append((username, client)) # we add the client to list
             
             client.send("ACK:Login successful!\n".encode()) # we tell the client login is successful!
             entry_message = "SERVER: "+f"{username} has entered the chat system!\n"
@@ -71,7 +72,7 @@ def server_listening(client, username): # responsible of collecting the message
 
         elif message =="3":
             client.send("SERVER:Exiting chat...".encode())
-            online_clients.remove((username, client)) # remove the user off the in-memory
+            CHAT_SERVER.online_clients.remove((username, client)) # remove the user off the in-memory
 
             if username in groups["default"]:
                 groups["default"].remove(username)
@@ -95,7 +96,7 @@ def lets_send_message_to_client(client, message):
 
 # needs to be further implemented so we first initiate a seperate group chat to send to everyone
 def lets_send_message_to_everyone(message, exclude_username=None): 
-        for username, client_socket in online_clients:
+        for username, client_socket in CHAT_SERVER.online_clients:
             if username != exclude_username:   # this ensures that we broadcast to everyone except the user who sent it
                 client_socket.sendall(message.encode())
 
