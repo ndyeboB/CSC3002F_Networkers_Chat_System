@@ -58,6 +58,10 @@ def server_listening(client, username): # responsible of collecting the message
             #lets_send_message_to_everyone(main_message)
             continue
 
+        if message == "EXITING":
+            grp_broadcast = "SERVER: "+f"{username} has left the default group. Goodbye {username}!"
+            lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
+
         # Choice 1: Connect to friend (peer)
         if message == "1":
             client.send("SERVER:Zamashengu is still working on this feature!".encode())
@@ -83,6 +87,8 @@ def server_listening(client, username): # responsible of collecting the message
         else:
             if username in groups["default"]:
                 group_message = f"{username}: {message}"
+                grp_broadcast = "SERVER: "+f"{username} has entered the default group!"
+                lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
                 send_to_default_group(group_message)
             else:
                 client.send("SERVER:Join the default group first (option 2)".encode())
