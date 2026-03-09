@@ -89,7 +89,7 @@ def interface_menu(client):
 
 def send_group_message(client):
      print("\nWELCOME TO OUR DEFAULT GROUP CHAT!!")
-     print("Type 'return' to go back to the menu")
+     print("Type 'return' to go back to the menu\n\nStart typing message!!")
 
      while True:
           message = input() # you write
