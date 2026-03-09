@@ -1,6 +1,7 @@
 # we are importing the required libaries
 import socket
 import threading
+import sys
 
 HOST = "127.0.0.1"
 PORT = 1234 # the range of use is 0 to 65535
@@ -8,7 +9,7 @@ PORT = 1234 # the range of use is 0 to 65535
 CLIENT_LIMIT = 5 # lets set a limit on the amount of people that can be a chat -- later we can build more capacity in our system
 
 class CHAT_SERVER:
-    online_clients = [] # list of all clients that are curently online and connected to the server
+    online_clients = [] # list of all clients that are curently online and connected to the serv
 
 groups = {"default": []} # default group just to show group chat demonstartion
 
@@ -51,16 +52,27 @@ def work_with_client(client):
 def server_listening(client, username): # responsible of collecting the message
     
     while True:
-        message = client.recv(2048).decode('utf-8') # listens for the message that the client wants to send
+        try :
+            message = client.recv(2048).decode('utf-8') # listens for the message that the client wants to send
+
+        except OSError:
+            print("Client is diconnected and socket is closed.")
+            break
+
 
         if message =='':
             #main_message = username + ':' + message
             #lets_send_message_to_everyone(main_message)
             continue
 
-        if message == "EXITING":
+        if message == "EXIT":
+            print(username, "has disconnected.")
+
             grp_broadcast = "SERVER: "+f"{username} has left the default group. Goodbye {username}!"
             lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
+            groups.remove(client)
+            client.close()
+            break
 
         # Choice 1: Connect to friend (peer)
         if message == "1":
@@ -74,14 +86,18 @@ def server_listening(client, username): # responsible of collecting the message
             else:
                 client.send("SERVER:You are already in the group.".encode())
 
-        elif message =="3":
-            client.send("SERVER:Exiting chat...".encode())
-            CHAT_SERVER.online_clients.remove((username, client)) # remove the user off the in-memory
+        elif message =="4":
+            
+            for user in CHAT_SERVER.online_clients:
+                    
+                    if user[1] == client:
 
-            if username in groups["default"]:
-                groups["default"].remove(username)
-            client.close()
+                        CHAT_SERVER.online_clients.remove(user)
+                        print(f"Exiting system....\nGoodbye {username}! Hope to see you soon!\n")
+                        
+            client.close()           
             break
+        
         
         # user has already pressed a option, --> default group
         else:
@@ -103,10 +119,25 @@ def lets_send_message_to_client(client, message):
 # needs to be further implemented so we first initiate a seperate group chat to send to everyone
 def lets_send_message_to_everyone(message, exclude_username=None): 
         for username, client_socket in CHAT_SERVER.online_clients:
-            if username != exclude_username:   # this ensures that we broadcast to everyone except the user who sent it
-                client_socket.sendall(message.encode())
+            try:
+                if username != exclude_username:   # this ensures that we broadcast to everyone except the user who sent it
+                    client_socket.sendall(message.encode())
 
-        
+            except:
+                print("Removing disconnected client")
+
+                if client_socket in CHAT_SERVER.online_clients:
+                    CHAT_SERVER.online_clients.remove(client_socket)
+
+def handleFile(client, headers, groupMembers):
+    fileSize = int(headers["Filesize"]) 
+    fileData= b''
+    remaining= fileSize
+
+    while remaining > 0:
+        chunk = client.recv(min(2048))
+        fileData+=chunk
+        remaining-= len(chunk)
 
 def send_to_default_group(message):
     for user in CHAT_SERVER.online_clients:

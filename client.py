@@ -3,6 +3,7 @@
 import CHAT_SERVER
 import socket
 import threading
+import sys
 
 HOST = '127.0.0.1'   #Server IP address (IPv4)
 PORT = 1234              #Port number the server is listening on
@@ -23,7 +24,7 @@ def listening_For_Messages(client):
                else:
                     print("Message is empty!")
           except:
-               print("Disconnected from the server")
+               print("\nDisconnected from the server")
                break
 
 
@@ -76,10 +77,11 @@ def interface_menu(client):
                client.sendall(choice.encode())
 
                if choice == "4":
-                    for user in CHAT_SERVER.online_clients:
-                         username = user[0]
-                         print("Goodbye {username}! Hope to see you soon!")
-                         break
+                    client.close()
+                    print("Byee..")
+                    client.close()
+                    sys.exit()
+                         
 
           elif choice == "3":
                send_group_message(client) # we need to make a function that allows messaging
@@ -89,16 +91,33 @@ def interface_menu(client):
 
 def send_group_message(client):
      print("\nWELCOME TO OUR DEFAULT GROUP CHAT!!")
-     print("Type 'return' to go back to the menu")
+     print("Type 'return' to go back to the menu\n\n Start typing message!!")
 
      while True:
           message = input() # you write
 
           if message.lower() == 'return': # exit
-               client.sendall("EXITING".encode())
+               client.sendall("is has exited the default group...".encode())
                break
           if message != "":
                client.sendall(message.encode())
+
+def sendFile(client, filepath,group):
+     with open(filepath, "rb") as f:
+          data = f.read()
+     fileName = filepath
+     fileSize = len(data)
+
+     header=f"""FILE
+     Sender: {client}
+Group: {group}
+Filename: {fileName}
+FileSize: {fileSize}
+
+"""
+     client.sendall(header.encode()) #??
+     client.sendall(data)
+
 
 
 

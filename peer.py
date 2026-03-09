@@ -37,7 +37,7 @@ def listen(client, username):
         sendMessage(finalMessage)
     else:
         print(f"The message sent from client: {username} is empty. Please try again.")
-class peer:    
+class Peer:    
     @staticmethod
     def main():
         server =socket.socket(socket.AF_INET, socket.SOCK_STREAM) # we are using TCP
@@ -45,7 +45,8 @@ class peer:
         
         #print(f"The server on {hostIP} {port} is listening for a connection...")
         initiator = input("Would you like to initiate a conversation (yes/no)?\n").lower()
-
+        client.sendall(initiator)
+        
         if initiator == "no":
             print("Waiting for initiator...")
             try:
