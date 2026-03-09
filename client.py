@@ -49,7 +49,7 @@ def peer_send_msg(peer):
               exit(0)
 
 
-def server_communication(client):
+def server_communication(client, p2p_socket):
 #Handles initial communication with the server, including sending the userID and starting the listening thread.
      while True:
           
@@ -75,15 +75,15 @@ def server_communication(client):
      threading.Thread(target=listening_For_Messages, args=(client, )).start()
      
      
-     interface_menu(client) # after login success, show the menu
+     interface_menu(client, p2p_socket) # after login success, show the menu
                               # main thread that handles sending messages
      send_message(client)
 
 
-def peer_chat(peer, address):
+def peer_chat(p2p_socket):
      while True:
           try: 
-               message = peer.recv(2048).decode('utf-8')
+               message = p2p_socket.recv(2048).decode('utf-8')
                if message != '':
                     userID = message.split(":")[0]
                     messageContent = message.split(":")[1]
@@ -97,10 +97,10 @@ def peer_chat(peer, address):
                print("Disconnected from the peer suddenly.")
                break
 
-     peer_send_msg(peer)
+     peer_send_msg(p2p_socket)
 
 
-def interface_menu(client):
+def interface_menu(client, p2p_socket):
      while True:
           print("\nWELCOME TO THE NETWORKERS CHAT SYSTEM!!")
           print("1. Connect to Peer")
@@ -114,6 +114,12 @@ def interface_menu(client):
                name = input("Please enter the person you want to chat with")
 
                client.sendall(f"GET_PEER:{name}".encode())
+               response = client.recv(2048).decode()
+               _, peer_ip, peer_port = response.split(":")
+
+               p2p_socket.connect((peer_ip, peer_port))
+
+               peer_send_msg(peer)
 
           elif choice == "2":
                client.sendall(choice.encode())
@@ -168,7 +174,7 @@ def main():
           print("Connection is unsuccessful!")
 
 
-     server_communication(client)
+     
 
      p2p_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
      try:
@@ -182,13 +188,15 @@ def main():
      p2p_socket.listen()
      print("The peer is listening for a connection from another peer...")
 
+     server_communication(client, p2p_socket)
+
      def accept_loop():
           while True:
                peer, address = p2p_socket.accept() # peer = peer_socket 
           
                print(f"Successfully connected to peer: {address[0]} {address[1]}")
           
-               threading.Thread(target=peer_chat, args=(client,)).start()
+               threading.Thread(target=peer_chat, args=(p2p_socket,)).start()
 
      threading.Thread(target=accept_loop, args=()).start()
      
