@@ -162,7 +162,7 @@ def peer_chat(p2p_socket, stop_event):
                     
           except:
                
-               print(f"\n{userID} has left the chat.")
+               print(f"\nTalk soon!.")
                stop_event.set() #new change
                break
 
@@ -337,6 +337,7 @@ def main():
                     incoming_peer_queue.put((peer, peer_name))
 
                     print(f"\n***{peer_name} wants to start a chat with you! \nIncoming connection with peer: {address[0]} {address[1]}...")  
+                    print("Type '5' to accept the invitation.")
                     # new change
                     print("Choose your action: ", end="", flush=True)                       
                     #handle_a_peer_chat(peer, CURRENT_USERNAME, peer_name=peer_name) # we start the full peer session without a thread so that it runs on the main thread
