@@ -1,7 +1,7 @@
 # we are importing the required libaries
 import socket
 import threading
-import peer
+
 
 HOST = "127.0.0.1"
 PORT = 1234 # the range of use is 0 to 65
@@ -9,57 +9,34 @@ PORT = 1234 # the range of use is 0 to 65
 
 class CHAT_SERVER:
     online_clients = [] # list of all clients that are curently online and connected to the server
+    #groups = {"default": []} # default group just to show group chat demonstartion
+    groups= [["Nothing"]*2]*[1] 
+
+
+def work_with_client(client, username):
     
-groups = {"default": []} # default group just to show group chat demonstartion
-
-
-
-def work_with_client(client):
-    # initial connection with the client
-
-    while True:
-        username = client.recv(2048).decode('utf-8') # wait for the username that yo may receive from the client
-        
-        if username == "":
-            print("The username given by the client is empty!")
-
-
-        username_used = False
-        for user in CHAT_SERVER.online_clients: # loop in the online_list to check if username already exists
-            if user[0] == username:
-                username_used = True
-                break
-        if username_used: # if the username has been found
-            client.sendall("ERROR:Username has been already taken".encode())
-        else:
-            CHAT_SERVER.online_clients.append((username, client)) # we add the client to list
-        
-            client.sendall("ACK:Login successful!\n".encode()) # we tell the client login is successful!
-            
-            entry_message = "SERVER: "+f"{username} has entered the chat system!"
-            lets_send_message_to_everyone(entry_message, exclude_username=username) 
-            # when a new user is added to the chat, every one else is notified
-            break
-        
+    threading.Thread(target=server_listening, args=(client, username)).start() # because we put the login implementation in main(), this function can just start the listener thread
+   
     # this CREATES a NEW THREAD
     # that thread runs server_listening
     # SO EACH CLIENT HAS ITS OWN LOOP!!!!!
     # without this 1 client could talk but with it each client runs indepedently
     
-    threading.Thread(target=server_listening, args=(client, username, )).start()
+
 
 
 # the server must actively listen for upcoming message from a client
 def server_listening(client, username): # responsible of collecting the message
     
     while True:
-        
-        message = client.recv(2048).decode('utf-8') # listens for the message that the client wants to send
-        
+        try:
+
+            message = client.recv(2048).decode('utf-8') # listens for the message that the client wants to send
+        except:
+            print(f"{username} disconnected unexpectedly.")
+            break
 
         if message =='':
-            #main_message = username + ':' + message
-            #lets_send_message_to_everyone(main_message)
             continue
 
         if message == "EXIT":
@@ -67,45 +44,77 @@ def server_listening(client, username): # responsible of collecting the message
 
             grp_broadcast = "SERVER: "+f"{username} has left the default group. Goodbye {username}!"
             lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
-            groups.remove(client)
-            client.close()
-            break
+            continue
 
         # Choice 1: Connect to friend (peer)
-        if "GET_PEER" in message:
-            #client.sendall("SERVER:Zamashengu is still working on this feature!".encode())
-            _, target = message.split(":")
+        if message.startswith("GET_PEER:"):
+            
+            _, target = message.split(":",1)
+            peer_ip = None
+            peer_port = None
+
             for user in CHAT_SERVER.online_clients:
                 if user[0] == target:
-                    ip = user[2][0]
-                    port = user[2][1]
-
-            client.sendall("ACK:{ip}{port}".encode())
+                    peer_ip = user[2]
+                    peer_port = user[3]
+                    break
+                    
+            if peer_ip:
+                client.sendall(f"ACK:{peer_ip}:{peer_port}".encode())
+            else:
+                client.sendall("ERROR:User not found".encode())
         
 
         # Choice 2: Join default group
         elif message == "2":
-            if username not in groups["default"]:
+            if username not in CHAT_SERVER.groups["default"]:
 
-                groups["default"].append(username)
+                CHAT_SERVER.groups["default"].append(username)
                 client.sendall("SERVER:You have joined the default group.".encode())
+                grp_broadcast = "SERVER: "+f"{username} has joined the default group!"
+                lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
             else:
                 client.sendall("SERVER:You are already in the group.".encode())
-        
+
+        #The functionality of creating a new group
+        elif message =="5":
+            groupName = input("Enter the name of the new group: ")
+            members= input("Enter a comma seperared list of members e.g Zama,Khanyi etc.")
+            allMembers = members.trim().split(",")
+            for member in allMembers:
+                if member not in CHAT_SERVER.online_clients:
+                    print(member+ " could not be added to the group")
+                    allMembers.remove(member)
+                else:
+                    continue
+            #if the group array has "Nothing", we add a new row to the groups
+            for i in range(len(CHAT_SERVER.groups)):
+                if CHAT_SERVER.groups[i] == "Nothing":
+                    CHAT_SERVER.groups[i][0] = groupName
+                    CHAT_SERVER.groups[i][1] = allMembers
+
+            #add the members to groups array
+            CHAT_SERVER.groups.append(groupName, allMembers)
+            send_to_group("You have been added to "+ groupName, groupName)
+            
+
+
+
         elif message =="4":
             client.sendall("SERVER:Exiting chat...".encode())
-            CHAT_SERVER.online_clients.remove((username, client))
 
-            CHAT_SERVER.online_clients.remove(user)
-            print(f"Exiting system....\nGoodbye {username}! Hope to see you soon!\n")
-                        
-            client.close()           
+            CHAT_SERVER.online_clients = [
+                u for u in CHAT_SERVER.online_clients if u[0] !=username # asked chat how to remove user from list 
+            ]
+
+            if username in CHAT_SERVER.groups["default"]:
+                CHAT_SERVER.groups["default"].remove(username)
+            client.close()
             break
         else:
-            if username in groups["default"]:
+            if username in CHAT_SERVER.groups["default"]:
                 group_message = f"{username}: {message}"
-                grp_broadcast = "SERVER: "+f"{username} has entered the default group!"
-                lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
+                
                 send_to_default_group(group_message)
             else:
                 client.sendall("SERVER:Join the default group first (option 2)".encode())
@@ -122,41 +131,34 @@ def lets_send_message_to_client(client, message):
 
 # needs to be further implemented so we first initiate a seperate group chat to send to everyone
 def lets_send_message_to_everyone(message, exclude_username=None): 
-        for username, client_socket in CHAT_SERVER.online_clients:
-            try:
-                if username != exclude_username:   # this ensures that we broadcast to everyone except the user who sent it
+        for username, client_socket, ip, peer_port in CHAT_SERVER.online_clients:
+            if username != exclude_username:   # this ensures that we broadcast to everyone except the user who sent it
+                try:
                     client_socket.sendall(message.encode())
-
-            except:
-                print("Removing disconnected client")
-
-                if client_socket in CHAT_SERVER.online_clients:
-                    CHAT_SERVER.online_clients.remove(client_socket)
-
-def handleFile(client, headers):
-    receiver = headers["Recipient"] #takes teh value from the header
-    fileSize = int(headers["Filesize"]) 
-    fileData= b''
-    remaining= fileSize
-
-    while remaining > 0:
-        chunk = client.recv(min(2048))
-        fileData+=chunk
-        remaining-= len(chunk)
-
-    #client.sendall(construct_header(headers).encode())
-    client.sendall(fileData)
+                except:
+                    pass
 
 
+# def send_to_default_group(message):
+#     for username, client_socket, ip, peer_port in CHAT_SERVER.online_clients:
+#         if username in CHAT_SERVER.groups["default"]:
+#             try:
+#                 client_socket.sendall(message.encode()) # works the same way as the function lets_send_messages_to_client
+#             except:
+#                 pass
 
+def send_to_group(message, groupName):
+    #for username, client_socket in CHAT_SERVER.online_clients:
+    for i in range(len(CHAT_SERVER.groups)):
+        if groupName == CHAT_SERVER.groups[i][0]:
+            for user in CHAT_SERVER.groups[i][1]:
+                for username, client_socket in CHAT_SERVER.online_clients:
+                    if user == username:
+                        try:
+                            client_socket.sendall(message.encode())
+                        except:
+                            pass
 
-def send_to_default_group(message):
-    for user in CHAT_SERVER.online_clients:
-        username = user[0]
-        client_socket = user[1]
-
-        if username in CHAT_SERVER.groups["default"]:
-            client_socket.sendall(message.encode()) # works the same way as the function lets_send_messages_to_client
 
 # main function
 def main():
@@ -172,22 +174,26 @@ def main():
         
 
     except:
-        print(f"ERROR! The server cannot bind to host: {HOST} and port: {PORT}. Please try again!")
-
+        print(f"ERROR! The server cannot bind to host: {HOST} and port: {PORT}.")
+        return
 
     server.listen()
-    print("The server is listening for a connection...")
+    print("The server is listening for connections...")
     
-    # this while loop will keep listening to client connections
+    # this while loop will keep listening to client connections -- MUST RUN FOREVER
     while True:
         client, address = server.accept() # client = client socket
         # address = represents where client comes from
-        print(f"Successfully connected to client: {address[0]} {address[1]}")
+        print(f"Successfully connected to client: {address[0]} {address[1]}") # this port is the client's tcp conn to the server, not the listening port
 
-        username = client.recv(2048).decode('utf-8') # wait for the username that yo may receive from the client
-        
+        data = client.recv(2048).decode('utf-8') # wait for the username that yo may receive from the client
+        username, peer_port = data.split(":")
+        peer_port = int(peer_port)
+
         if username == "":
             print("The username given by the client is empty!")
+            client.close()
+            continue # makes it got back to waiting...
 
 
         username_used = False
@@ -197,19 +203,22 @@ def main():
                 break
         if username_used: # if the username has been found
             client.sendall("ERROR:Username has been already taken".encode())
-        else:
-            CHAT_SERVER.online_clients.append((username, client, address)) # we add the client to list
+            client.close()
+            continue # makes it got back to waiting...
+
         
-            client.sendall("ACK:Login successful!\n".encode()) # we tell the client login is successful!
-            
-            entry_message = "SERVER: "+f"{username} has entered the chat system!"
-            lets_send_message_to_everyone(entry_message, exclude_username=username) 
-            # when a new user is added to the chat, every one else is notified
-            break
-            
+        CHAT_SERVER.online_clients.append((username, client, address[0], peer_port)) # we add the client to list
+    
+        client.sendall("ACK:Login successful!\n".encode()) # we tell the client login is successful!
+        
+        entry_message = "SERVER: "+f"{username} has entered the chat system!"
+        lets_send_message_to_everyone(entry_message, exclude_username=username) 
+        # when a new user is added to the chat, every one else is notified
         
             
-        #threading.Thread(target=CHAT_SERVER.work_with_client, args=(client,)).start()  
+        
+         # we create a thread for THIS client so  we go back to accepting new ones   
+        threading.Thread(target=work_with_client, args=(client, username, )).start()  
 
 if __name__ == '__main__':
     main()
