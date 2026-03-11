@@ -40,6 +40,9 @@ def server_listening(client, username): # responsible of collecting the message
             continue
 
         if message == "EXITING":
+
+            if username in CHAT_SERVER.groups["default"]:
+                CHAT_SERVER.groups["default"].remove(username)
             grp_broadcast = "SERVER: "+f"{username} has left the default group. Goodbye {username}!"
             lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
             continue
