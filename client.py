@@ -14,8 +14,6 @@ server_msg_queue = queue.Queue()
 peer_session_active = threading.Event()
 peer_session_active.set()  # start cleared (no peer session running)
 
-print_lock = threading.Lock()
-
 def listening_For_Messages(client):
 # This function continously listens for incoming messages from the server. It runs on a separate thread so that the client can send and receive messages simultaneously.
      while True:
@@ -161,11 +159,15 @@ def interface_menu(client, p2p_socket, username):
      
 
 
-def interface_menu(client, p2p_socket):
+def interface_menu(client, p2p_socket, username):
      peer_session_active.wait()  # block here if a peer session is running
      while True:
-     
-          print_menu()
+          peer_session_active.wait()  # block here if a peer session is running
+          print("\nWELCOME TO THE NETWORKERS CHAT SYSTEM!!")
+          print("1. Connect to Peer")
+          print("2. Join Default Group")
+          print("3. Send messages to Default group")
+          print("4. Exit")
 
           choice = input("Choose your action: \n")
 
