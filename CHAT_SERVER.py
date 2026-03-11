@@ -172,7 +172,7 @@ def main():
         
         CHAT_SERVER.online_clients.append((username, client, address[0], peer_port)) # we add the client to list
     
-        client.sendall("ACK:Login successful!\n".encode()) # we tell the client login is successful!
+        client.sendall("\nACK:Login successful!\n".encode()) # we tell the client login is successful!
         
         entry_message = "SERVER: "+f"{username} has entered the chat system!"
         lets_send_message_to_everyone(entry_message, exclude_username=username) 
