@@ -10,7 +10,9 @@ PORT = 1234 # the range of use is 0 to 65
 class CHAT_SERVER:
     online_clients = [] # list of all clients that are curently online and connected to the server
     #groups = {"default": []} # default group just to show group chat demonstartion
-    groups= [["Nothing"]*2]*[1] 
+
+    #creates the 2D array to store the groups
+    groups= [["Nothing"]*2 for x in range(1)]
 
 
 def work_with_client(client, username):
@@ -66,7 +68,7 @@ def server_listening(client, username): # responsible of collecting the message
         
 
         # Choice 2: Join default group
-        elif message == "2":
+        elif message == "3":
             if username not in CHAT_SERVER.groups["default"]:
 
                 CHAT_SERVER.groups["default"].append(username)
@@ -77,47 +79,60 @@ def server_listening(client, username): # responsible of collecting the message
                 client.sendall("SERVER:You are already in the group.".encode())
 
         #The functionality of creating a new group
-        elif message =="5":
-            groupName = input("Enter the name of the new group: ")
-            members= input("Enter a comma seperared list of members e.g Zama,Khanyi etc.")
-            allMembers = members.trim().split(",")
+        elif message =="2":
+            groupName =  client.recv(2048).decode('utf-8')
+            members =  client.recv(2048).decode('utf-8')
+            allMembers = members.strip().split(",")
             for member in allMembers:
-                if member not in CHAT_SERVER.online_clients:
-                    print(member+ " could not be added to the group")
-                    allMembers.remove(member)
-                else:
-                    continue
+                found = False
+                for x in range(len(CHAT_SERVER.online_clients)):
+                    if member == CHAT_SERVER.online_clients[x][0]:
+                        found = True
+                        continue
+                       
+            if not found:
+                client.sendall(member+ " could not be added to the group".encode())
+                allMembers.remove(member)
+
             #if the group array has "Nothing", we add a new row to the groups
             for i in range(len(CHAT_SERVER.groups)):
-                if CHAT_SERVER.groups[i] == "Nothing":
+                if CHAT_SERVER.groups[i][0] == "Nothing" or CHAT_SERVER.groups[i][1] =="Nothing":
                     CHAT_SERVER.groups[i][0] = groupName
                     CHAT_SERVER.groups[i][1] = allMembers
+                    print(CHAT_SERVER.groups[i][0])
+                    print(CHAT_SERVER.groups[i][1])
 
-            #add the members to groups array
-            CHAT_SERVER.groups.append(groupName, allMembers)
+                else:
+                    CHAT_SERVER.groups.append((groupName, allMembers))
+
+
             send_to_group("You have been added to "+ groupName, groupName)
-            
+            client.sendall(("Group "+ groupName+ " was successfully created.\n").encode())
 
 
 
-        elif message =="4":
+        elif message =="5":
             client.sendall("SERVER:Exiting chat...".encode())
 
             CHAT_SERVER.online_clients = [
                 u for u in CHAT_SERVER.online_clients if u[0] !=username # asked chat how to remove user from list 
             ]
 
-            if username in CHAT_SERVER.groups["default"]:
-                CHAT_SERVER.groups["default"].remove(username)
-            client.close()
-            break
-        else:
-            if username in CHAT_SERVER.groups["default"]:
-                group_message = f"{username}: {message}"
+            for x in range(len(CHAT_SERVER.groups)):
+                members = CHAT_SERVER.groups[x][1]
+
+                for y in range(len(members)):
+                    if username == members[y]:
+                        members.remove(username)
+                        client.close()
+                        break
+        # else:
+        #     if username in CHAT_SERVER.groups["default"]:
+        #         group_message = f"{username}: {message}"
                 
-                send_to_default_group(group_message)
-            else:
-                client.sendall("SERVER:Join the default group first (option 2)".encode())
+        #         send_to_default_group(group_message)
+        #     else:
+        #         client.sendall("SERVER:Join the default group first (option 2)".encode())
 
 
            
@@ -152,7 +167,7 @@ def send_to_group(message, groupName):
     for i in range(len(CHAT_SERVER.groups)):
         if groupName == CHAT_SERVER.groups[i][0]:
             for user in CHAT_SERVER.groups[i][1]:
-                for username, client_socket in CHAT_SERVER.online_clients:
+                for username, client_socket, ip, peer_port in CHAT_SERVER.online_clients:
                     if user == username:
                         try:
                             client_socket.sendall(message.encode())
@@ -209,7 +224,7 @@ def main():
         
         CHAT_SERVER.online_clients.append((username, client, address[0], peer_port)) # we add the client to list
     
-        client.sendall("ACK:Login successful!\n".encode()) # we tell the client login is successful!
+        client.sendall("\nACK:Login successful!\n".encode()) # we tell the client login is successful!
         
         entry_message = "SERVER: "+f"{username} has entered the chat system!"
         lets_send_message_to_everyone(entry_message, exclude_username=username) 
