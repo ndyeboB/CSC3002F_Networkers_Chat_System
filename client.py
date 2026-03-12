@@ -3,7 +3,7 @@
 import socket
 import threading
 import queue
-import CHAT_SERVER
+from CHAT_SERVER import CHAT_SERVER
 
 
 HOST = '127.0.0.1'   #Server IP address (IPv4)
@@ -164,35 +164,26 @@ def interface_menu(client, p2p_socket, username):
      while True:
           peer_session_active.wait()  # block here if a peer session is running
           print("\nWELCOME TO THE NETWORKERS CHAT SYSTEM!!")
-          print("1. Connect to Peer")
-          print("2. Join Default Group")
-          print("3. Send messages to Default group")
-          print("4. Exit")
+          print("1. Connect to Peer")   
+          print("2. Create a new group")
+          print("3. Join a group")
+          print("4. Send messages to a group")
+          print("5. Exit")
 
                
-               choice = input("Choose your action: \n")
+          choice = input("Choose your action: \n")
 
           if choice == "1":
                name = input("\nPlease enter the username of the person you want to chat with: ")
 
-                    client.sendall(f"GET_PEER:{name}".encode())
+               client.sendall(f"GET_PEER:{name}".encode())
 
-                    try:
+               try:
 
                     response = server_msg_queue.get(timeout=5) # we wait for the reply via the queue, not via recv() because there would be a race condition. listening_for_Mess will put the reply here
                except queue.Empty:
                     print("No response from server (timeout). Try again")
                     continue
-
-                    
-
-
-
-               elif choice == "4":
-                    client.sendall(choice.encode())
-                    
-                    print("Goodbye! Hope to see you soon!")
-                    break
 
                peer_ip = peer_info[1].strip()
                peer_port = int(peer_info[2])
@@ -212,8 +203,16 @@ def interface_menu(client, p2p_socket, username):
                     print(e)
                     print("Could not connect to peer.")
 
-
+          #send to the server to continue with the creation of the group
           elif choice == "2":
+               client.sendall(choice.encode())
+               groupName = input("Enter the name of the new group: \n")
+               members= input("Enter a comma seperared list of members (e.g Zama,Khanyi): \n") 
+
+               client.sendall(groupName.encode())
+               client.sendall(members.encode())
+
+          elif choice == "3":
                client.sendall(choice.encode())
                # we want to wait for the server's joined reply before looping
                try:
@@ -223,11 +222,13 @@ def interface_menu(client, p2p_socket, username):
                except queue.Empty :
                     pass
 
-          elif choice =="3":
-               send_group_message(client)
+
+          #send message to groups
+          elif choice =="4":
+               send_group_message(client, username)
                
 
-          elif choice == "4":
+          elif choice == "5":
                client.sendall(choice.encode())
                
                print("Goodbye! Hope to see you soon!")
@@ -240,20 +241,28 @@ def interface_menu(client, p2p_socket, username):
 
           
 
-          
-def send_group_message(client):
-     print("\nWELCOME TO OUR DEFAULT GROUP CHAT!!")
-     print("Type 'return' to go back to the menu\n\nStart typing message!")
+    # include the part where we ask the group name       
+def send_group_message(client, username):
+     print("\nWELCOME TO OUR GROUP CHATS!!")
+     groupName = input("Enter the group name to chat in: ")
 
-     while True:
-          message = input() # you write
+     for x in range(len(CHAT_SERVER.groups)):
+          if groupName == CHAT_SERVER.groups[x][0]:
+               print("Type 'return' to go back to the menu\n\nStart typing message!")
 
-          if message.lower() == 'return': # exit
-               client.sendall("is has exited the default group...".encode())
-               break
-          if message != "":
-               client.sendall(message.encode())
+               while True:
+                    message = input() # you write
 
+                    if message.lower() == 'return': # exit
+                         CHAT_SERVER.send_to_group(username+ " has exited "+ groupName, groupName)
+                         break
+                    if message != "":
+                         CHAT_SERVER.send_to_group(message, groupName)
+          else:
+               print("The group does not exist.")
+
+
+#NEEDS TO BE DONE
 def sendFile(client, filepath):
      with open(filepath, "rb") as f:
           data = f.read()
