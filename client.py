@@ -12,11 +12,12 @@ PORT = 1234              #Port number the server is listening on
 CURRENT_USERNAME = None
 
 server_msg_queue = queue.Queue()
-peer_session_active = threading.Event()
+
+peer_session_active = threading.Event() # used to pause the menu while a peer session is active
 peer_session_active.set()  # start cleared (no peer session running)
 
-
-
+# new change
+incoming_peer_queue = queue.Queue() # used to safely pass incoming peer connections from accept_loop to main thread
 
 def listening_For_Messages(client):
 # This function continously listens for incoming messages from the server. It runs on a separate thread so that the client can send and receive messages simultaneously.
@@ -26,17 +27,17 @@ def listening_For_Messages(client):
                if message == '':
                     continue
 
-               if message.startswith("ACK:") or message.startswith("ERROR:"):
+               if (message.startswith("ACK:") or message.startswith("ERROR:")): 
                     server_msg_queue.put(message)
                else:
                     parts = message.split(":",1)
 
                     if len(parts) ==2:
                          print(f"\n[{parts[0]}]: {parts[1]}")
-                         print("Choose your action: ", end="", flush=True) # not a threading problem but a prompting problem
+                         print("\n", end="", flush=True) # not a threading problem but a prompting problem
                     else:
                          print(f"\n{message}")
-                         print("Choose your action: ", end="", flush=True)
+                         print("\n", end="", flush=True)
                              
                
           except Exception as e:
@@ -64,11 +65,19 @@ def send_message(client):
               print("Empty message!")
               
 
-
-def peer_send_msg(p2p_socket, username):
+# new change = added 3rd arg
+#   SENDS MESSAGES TYPED BY THE USER TO THE CONNECTED PEER
+# STOPS WHEN THE USER TYPES 'quit' OR WHEN STOP_EVENT IS SET
+def peer_send_msg(p2p_socket, username, stop_event):
       print("type 'quit' to return to the menu\n")
-      while True:
+
+      while not stop_event.is_set(): 
          message = input("Peer Message: ")
+          # new change
+         if stop_event.is_set(): # RE-CHECK AFTER INPUT() RETURNS IN CASE THE PEER DISCONNECTED WHILE WE WERE WAITING
+              print("\n[Session ended by remote peer]")
+              break
+     
          if message.lower() == 'quit':
               p2p_socket.sendall(f"{username}: has left the chat".encode())
               break
@@ -76,18 +85,25 @@ def peer_send_msg(p2p_socket, username):
               p2p_socket.sendall(f"{username}: {message}".encode())
          else:
               print("Empty message!")
-              
+
+# RUNS A FULL 2-WAY PEER CHAT SESSION
+# CALLED ON THE MAIN THREAD FRO BOTH THE OUTGOING CONNECTOR AND THE INCOMING ACCEPTOR (after the acceptor queues the connection)
+#             
 def handle_a_peer_chat(p2p_socket, username, peer_name="peer", send_handshake=False):
      #runs a full two-way peer chat session where it is called by both the connector and the acceptor so both sides can send & receive
      peer_session_active.clear()  # PAUSE the menu loop
 
-     print(f"\nConnected to {peer_name}!")
+     print(f"\nConnected to {peer_name}! Type 'quit' to end the chat session.")
+
      if send_handshake: # only the connector sends the username handshake
           p2p_socket.sendall(f"USERNAME:{username}".encode()) # we want to send our username to the peer so they know who they are connecting to
      
-     threading.Thread(target=peer_chat, args=(p2p_socket,), daemon=True).start()
+     stop_event = threading.Event() # shared bet rceiver and sender
+
+     threading.Thread(target=peer_chat, args=(p2p_socket,stop_event), daemon=True).start()
      
-     peer_send_msg(p2p_socket, username)
+     peer_send_msg(p2p_socket, username, stop_event) # new change = added 3rd arg
+
      p2p_socket.close()
      peer_session_active.set()    # RESUME the menu loop
      print("\nPeer session ended. Returning to menu...")
@@ -125,15 +141,19 @@ def server_communication(client, p2p_socket):
                               # main thread that handles sending messages
      
 
-
-def peer_chat(p2p_socket):
+# new change = added 2nd arg
+# RECEIVES AND PRINTS MESSAGES FROM THE CONNECTED PEER
+# SETS STOP_EVENT WHEN THE PEER DISCONNECTS SO peer_send_msg CAN EXIT CLEANLY
+def peer_chat(p2p_socket, stop_event):
      while True:
           try: 
                message = p2p_socket.recv(2048).decode('utf-8')
 
                if not message:
                     print("\nPeer has disconnected.")
+                    stop_event.set() # SIGNAL peer_send_msg TO STOP BLOCKING ON INPUT()
                     break
+
                # username handshake message , we skip it, its not a chat message
                if message.startswith("USERNAME:"):
                     continue
@@ -151,9 +171,10 @@ def peer_chat(p2p_socket):
                print(f"\n[{userID}]: {messageContent}")
                print("Peer Message: ", end="", flush=True)
                     
-          except Exception as e:
-               print(e)
-               print("Disconnected from the peer suddenly.")
+          except:
+               
+               print(f"\nTalk soon!.")
+               stop_event.set() #new change
                break
 
      
@@ -163,6 +184,9 @@ def interface_menu(client, p2p_socket, username):
      
      while True:
           peer_session_active.wait()  # block here if a peer session is running
+
+          has_incoming = not incoming_peer_queue.empty() # LET THE USER KNOW IF SOMEONE IS WAITING TO CHAT
+
           print("\nWELCOME TO THE NETWORKERS CHAT SYSTEM!!")
           print("1. Connect to Peer")   
           print("2. Create a new group")
@@ -170,7 +194,11 @@ def interface_menu(client, p2p_socket, username):
           print("4. Send messages to a group")
           print("5. Exit")
 
-               
+          # ADDED A 5TH CHOICE SO THE RECEIVER CAN 'ACCEPT' THE INVITAION TO CONNECT AND CHAT
+          if has_incoming:
+               print("5. Accept incoming peer connection")
+
+           
           choice = input("Choose your action: \n")
 
           if choice == "1":
@@ -220,6 +248,7 @@ def interface_menu(client, p2p_socket, username):
                     parts = reply.split(":",1)
                     print(parts[1] if len(parts) == 2 else reply)
                except queue.Empty :
+                    #print("No reply from server")
                     pass
 
 
@@ -233,7 +262,14 @@ def interface_menu(client, p2p_socket, username):
                
                print("Goodbye! Hope to see you soon!")
                break
-
+          # ACCEPT INCOMING PEER CONN
+          # INCOMING CONN IS HANDLED HERE ON THE MAIN THREAD SO THERE IS ONLY EVER ONE INPUT() AT A TIME
+          elif choice == "5":
+               try:
+                    peer, peer_name = incoming_peer_queue.get_nowait()
+                    handle_a_peer_chat(peer, username, peer_name=peer_name, send_handshake=False)
+               except queue.Empty:
+                    print("No pending incoming connections.")
              
           else:
                #print("Invalid choice!")
@@ -308,7 +344,7 @@ def main():
      
 
      def accept_loop():
-          global CURRENT_USERNAME
+          #global CURRENT_USERNAME
 
           while True:
                try:
@@ -321,8 +357,15 @@ def main():
                          peer_name = handshake.split(":", 1)[1]
                     else:
                          peer_name = address[0] # else we just keep the port of the sender
-                    print(f"\n***{CURRENT_USERNAME} wants to start a chat with you! \nIncoming connection with peer: {address[0]} {address[1]}...")                         
-                    handle_a_peer_chat(peer, CURRENT_USERNAME, peer_name=peer_name) # we start the full peer session without a thread so that it runs on the main thread
+
+                    #new change
+                    incoming_peer_queue.put((peer, peer_name))
+
+                    print(f"\n***{peer_name} wants to start a chat with you! \nIncoming connection with peer: {address[0]} {address[1]}...")  
+                    print("Type '5' to accept the invitation.")
+                    # new change
+                    print("Choose your action: ", end="", flush=True)                       
+                    #handle_a_peer_chat(peer, CURRENT_USERNAME, peer_name=peer_name) # we start the full peer session without a thread so that it runs on the main thread
                except Exception as e:
                     print(e)
                     break
