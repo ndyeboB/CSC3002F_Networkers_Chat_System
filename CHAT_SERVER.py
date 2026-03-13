@@ -8,7 +8,7 @@ PORT = 1234 # the range of use is 0 to 65
  # lets set a limit on the amount of people that can be a chat -- later we can build more capacity in our system
 
 class CHAT_SERVER:
-    online_clients = [] # list of all clients that are curently online and connected to the server
+    online_clients = [] #list of all clients that are curently online and connected to the server
     groups = {"default": []} # default group just to show group chat demonstartion
 
 
@@ -89,6 +89,74 @@ def server_listening(client, username): # responsible of collecting the message
             client.close()
             break
 
+        elif message == "LIST_USERS":
+            user_list =[]
+
+            for user in CHAT_SERVER.online_clients:
+                user_list.append(user[0])
+
+            users = ", ".join(user_list)
+            
+            response = f"ACK:LIST_USERS: {users}"
+            client.sendall(response.encode())
+
+        elif message.startswith("CREATE_GROUP:"):
+            _, groupname = message.split(":",1)
+
+            if groupname in CHAT_SERVER.groups:
+                client.sendall("ERROR:Group already exits.".encode())
+
+            else:
+                CHAT_SERVER.groups[groupname] = [username]
+                client.sendall(f"ACK:Group created: {groupname}".encode())
+
+        elif message.startswith("JOIN_GROUP:"):
+            _, groupname = message.split(":",1)
+
+            if groupname not in CHAT_SERVER.groups:
+                client.sendall("ERROR:Group not found".encode())
+            else:
+                if username not in CHAT_SERVER.groups[groupname]:
+                    CHAT_SERVER.groups[groupname].append(username)
+                    client.sendall(f"ACK:Joined group: {groupname}".encode())
+                else:
+                    client.sendall(f"ERROR:You are already in the group")
+
+        elif message.startswith("EXIT_GROUP:"):
+            _,groupname = message.split(":",1)
+            if groupname not in CHAT_SERVER.groups:
+                client.sendall("ERROR:Group not found".encode())
+
+            else:
+                if username in CHAT_SERVER.groups[groupname]:
+                    CHAT_SERVER.groups[groupname].remove(username)
+                    client.sendall(f"ACK:Exited group: {groupname}".encode())
+                else:
+                    client.sendall("ERROR:You are not in the group".encode())
+
+        elif message.startswith("GROUP_MSG:"):
+            try:
+                _,groupname, group_message = message.split(":",2)
+                if groupname not in CHAT_SERVER.groups:
+                    client.sendall("ERROR:Group not found".encode())
+                    continue
+                if username not in CHAT_SERVER.groups[groupname]:
+                    client.sendall("ERROR:You are not in the group".encode())
+                    continue
+
+                for user, sock, ip, port, in CHAT_SERVER.online_clients:
+                    if user in CHAT_SERVER.groups[groupname]:
+                        try:
+                            sock.sendall(f"<{groupname}>:{username}: {group_message}".encode())
+                        except:
+                            pass
+
+            except:
+                client.sendall("ERROR:Invalid group message".encode())
+
+
+
+
         else:
             if username in CHAT_SERVER.groups["default"]:
                 group_message = f"{username}: {message}"
@@ -157,7 +225,7 @@ def main():
         peer_port = int(peer_port)
 
         if username == "":
-            print("The username given by the client is empty!")
+            print("ERROR:The username given by the client is empty!")
             client.close()
             continue # makes it got back to waiting...
 
