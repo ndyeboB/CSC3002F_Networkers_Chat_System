@@ -126,7 +126,7 @@ def server_listening(client, username): # responsible of collecting the message
                 else:
                     client.sendall(f"ACK:You are already in the group {groupname}".encode())
                 
-                    client.sendall(f"ERROR:You are already in the group".encode())
+                    client.sendall("ERROR:You are already in the group".encode())
 
         elif message.startswith("EXIT_GROUP:"):
             _,groupname = message.split(":",1)
