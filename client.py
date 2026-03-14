@@ -247,7 +247,7 @@ def peer_chat(p2p_socket, stop_event):
                     
           except:
                
-               print(f"\nTalk soon!.")
+               print(f"\nTalk soon! Type 'quit'!.")
                stop_event.set() #new change
                break
 
