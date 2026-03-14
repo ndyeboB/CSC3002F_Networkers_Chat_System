@@ -53,15 +53,15 @@ def server_listening(client, username): # responsible of collecting the message
             continue
 
         # Choice 1: Connect to friend (peer)
-        if message.startswith("GET_PEER:"):
+        elif message.startswith("GET_PEER:"):
             
             _, target = message.split(":",1)
             peer_ip = None
             peer_port = None
 
-            # you changed here tooo
-            for username, client_sock, ip, P2Ptcp_port, udp_port in CHAT_SERVER.online_clients:
-                if username == target:
+            
+            for user, client_sock, ip, P2Ptcp_port, udp_port in CHAT_SERVER.online_clients:
+                if user == target:
                     peer_ip = ip
                     peer_port = P2Ptcp_port
                     break
@@ -158,7 +158,7 @@ def server_listening(client, username): # responsible of collecting the message
                             pass
             except:
                 client.sendall("ERROR:Invalid group message".encode())
-        #Not sure how yest, we will just figure it out as we code neh
+
         #server recieves communication from the server of a request to send a file
         elif message.startswith("FILE:"):
             _, filenamme, filesize_string = message.split(":", 2)

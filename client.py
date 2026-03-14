@@ -84,7 +84,9 @@ def send_message(client):
 #   SENDS MESSAGES TYPED BY THE USER TO THE CONNECTED PEER
 # STOPS WHEN THE USER TYPES 'quit' OR WHEN STOP_EVENT IS SET
 def peer_send_msg(p2p_socket, username, stop_event):
-      print("type 'quit' to return to the menu\n")
+      print("type 'quit' to return to the menu")
+      print("type '/file' to send a file\n")
+
 
       while not stop_event.is_set(): 
          message = input("Peer Message: ")
@@ -97,9 +99,34 @@ def peer_send_msg(p2p_socket, username, stop_event):
               p2p_socket.sendall(f"{username}: has left the chat".encode())
               break
          if message != '':
-              p2p_socket.sendall(f"{username}: {message}".encode())
+              if message == "/file":
+                   filepath = input("Enter the filepath:")
+                   send_fileP2P(p2p_socket, filepath)
+              else:     
+                  p2p_socket.sendall(f"{username}: {message}".encode())
          else:
               print("ERROR:Empty message!")
+
+#the sending of the file between peers
+#different because its uses the peer-2-peer socket
+def send_fileP2P(p2p_socket, filepath):
+     try:
+          #extract the file name and size from the filepath provided by the user
+          filename = os.path.basename(filepath)
+          filesize = os.path.getsize(filepath)
+
+          #send the metadata to the server
+          p2p_socket.sendall(f"FILE:{filename}:{filesize}".encode())
+
+          #sending of the chunks of data in bytes
+          with open(filepath, "rb") as f:
+               while chunk := f.read():
+                    p2p_socket.sendall(chunk)
+          print(f"File '{filename}' send successfully!")
+     except Exception as e:
+          print(f"Error sending file: {e}")
+
+
 
 # RUNS A FULL 2-WAY PEER CHAT SESSION
 # CALLED ON THE MAIN THREAD FRO BOTH THE OUTGOING CONNECTOR AND THE INCOMING ACCEPTOR (after the acceptor queues the connection)
@@ -174,6 +201,29 @@ def peer_chat(p2p_socket, stop_event):
                # username handshake message , we skip it, its not a chat message
                if message.startswith("USERNAME:"):
                     continue
+               
+               #option to share a file
+               if message.startswith("FILE:"):
+                    _, filename, filesize_String = message.split(":", 2)
+                    filesize = int(filesize_String)
+
+                    #save the file to a certain directory through a specified path- if the directory does not exist - the system will just make one
+                    os.makedirs("downloads", exist_ok = True)
+                    filepath = os.path.join("downloads", filename)
+
+                    #reading and writing of the chunks of data from server
+                    with open(filepath, "wb") as f:
+                         current_bytes = 0       #number of chunks of data that we have recieved  so far
+                         while current_bytes < filesize:
+                              chunk = p2p_socket.recv(min(4096, filesize - current_bytes))
+                              if not chunk:
+                                   break
+                              f.write(chunk)
+                              current_bytes += len(chunk)
+                    print(f"\nFile received and saved to: {filepath}")
+                    continue
+
+
 
                parts = message.split(":",1)
 
@@ -356,13 +406,13 @@ def send_group_message(client):
           if message !="":
                if message == "/file":  #option to allow user to file share
                     filepath = input("Enter the filepath: ")
-                    send_file(client, filepath)
+                    send_fileCS(client, filepath)
                else:
-                    input_field(message, CURRENT_USERNAME, "grou") #come back here 
+                    input_field(message, CURRENT_USERNAME, group) #come back here 
                     client.sendall(f"GROUP_MSG:{group}:{message}".encode())
 
 #This function is called when the user wants to send a file to another user
-def send_file(client, filepath):
+def send_fileCS(client, filepath):
      try:
           #extract the file name and size from the filepath provided by the user
           filename = os.path.basename(filepath)
@@ -419,6 +469,7 @@ def reset_InactivityTimer(sender, target):
      inactivity_time.start()
 
 def receiving_theUDP():
+     global udp_socket_client
      while True:
           try:
                data, address = udp_socket_client.recvfrom(2048)
@@ -433,10 +484,6 @@ def receiving_theUDP():
           except Exception as e:
                print(f"UDP receive error: {e}")
 
-#do i even ever call this one
-def clear_typing_notification(sender,):
-     cancel_timer()
-     print(f"{sender} stopped typing")
 
 #Main function
 def main():
