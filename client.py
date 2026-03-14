@@ -271,7 +271,7 @@ def interface_menu(client, p2p_socket, username):
 
           # ADDED A 7TH CHOICE SO THE RECEIVER CAN 'ACCEPT' THE INVITAION TO CONNECT AND CHAT
           if has_incoming:
-               print("9. Accept incoming peer connection")
+               print("8. Accept incoming peer connection")
 
            
           choice = input("Choose your action: \n")
