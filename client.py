@@ -66,7 +66,7 @@ def listening_For_Messages(client):
                          print(f"\n[{parts[0]}]: {parts[1]}")
                          print("\n", end="", flush=True) # not a threading problem but a prompting problem
                     else:
-                         print("are u the culprit?")
+                         
                          print(f"\n{message}")
                          print("\n", end="", flush=True)
                              
@@ -288,7 +288,7 @@ def interface_menu(client, p2p_socket, username):
                     print("ERROR:No response from server (timeout). Try again")
                     continue
 
-               if response.startsWith("ERROR"):
+               if response.startswith("ERROR"):
                     print(response)
                     continue
 
