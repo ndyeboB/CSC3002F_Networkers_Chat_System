@@ -10,6 +10,10 @@ from CHAT_SERVER import CHAT_SERVER
 HOST = '127.0.0.1'   #Server IP address (IPv4)
 PORT = 1234              #Port number the server is listening on
 
+
+
+
+
 CURRENT_USERNAME = None
 
 server_msg_queue = queue.Queue()
@@ -48,17 +52,8 @@ def listening_For_Messages(client):
                
           except Exception as e:
                print(e)
-               print("Disconnected from the server")
+               print("ERROR:Disconnected from the server")
                break
-
-#def handleClient(client):
-     #while True:
-          #data = client.recv(2048)
-
-          #if not data:
-               #break
-
-#def processMessage that sends to the memebers in the group 
 
 
 def send_message(client):
@@ -68,7 +63,7 @@ def send_message(client):
          if message != '':
               client.sendall(message.encode())
          else:
-              print("Empty message!")
+              print("ERROR:Empty message!")
               
 
 # new change = added 3rd arg
@@ -90,7 +85,7 @@ def peer_send_msg(p2p_socket, username, stop_event):
          if message != '':
               p2p_socket.sendall(f"{username}: {message}".encode())
          else:
-              print("Empty message!")
+              print("ERROR:Empty message!")
 
 # RUNS A FULL 2-WAY PEER CHAT SESSION
 # CALLED ON THE MAIN THREAD FRO BOTH THE OUTGOING CONNECTOR AND THE INCOMING ACCEPTOR (after the acceptor queues the connection)
@@ -134,9 +129,9 @@ def server_communication(client, p2p_socket):
                     CURRENT_USERNAME = userID
                     break
                else:
-                    print("Try again with another username!")
+                    print("ERROR:Try again with another username!")
           else:
-               print("Invalid: UserID cannot be empty")
+               print("ERROR:UserID cannot be empty")
                
           #start the listening thread after login success
      
@@ -193,15 +188,17 @@ def interface_menu(client, p2p_socket, username):
           has_incoming = not incoming_peer_queue.empty() # LET THE USER KNOW IF SOMEONE IS WAITING TO CHAT
 
           print("\nWELCOME TO THE NETWORKERS CHAT SYSTEM!!")
-          print("1. Connect to Peer")   
-          print("2. Create a new group")
-          print("3. Join a group")
-          print("4. Send messages to a group")
-          print("5. Exit")
+          print("1. Connect to Peer")
+          print("2. List online users")
+          print("3. Create group")
+          print("4. Join group")
+          print("5. Send group message")
+          print("6. Exit a group")
+          print("7. Exit the chat system")
 
-          # ADDED A 5TH CHOICE SO THE RECEIVER CAN 'ACCEPT' THE INVITAION TO CONNECT AND CHAT
+          # ADDED A 7TH CHOICE SO THE RECEIVER CAN 'ACCEPT' THE INVITAION TO CONNECT AND CHAT
           if has_incoming:
-               print("5. Accept incoming peer connection")
+               print("8. Accept incoming peer connection")
 
            
           choice = input("Choose your action: \n")
@@ -215,7 +212,7 @@ def interface_menu(client, p2p_socket, username):
 
                     response = server_msg_queue.get(timeout=5) # we wait for the reply via the queue, not via recv() because there would be a race condition. listening_for_Mess will put the reply here
                except queue.Empty:
-                    print("No response from server (timeout). Try again")
+                    print("ERROR:No response from server (timeout). Try again")
                     continue
 
                if response.startsWith("ERROR"):
@@ -223,8 +220,8 @@ def interface_menu(client, p2p_socket, username):
                     continue
 
                peer_info = response.split(":")
-               if len(peer_info)<3:
-                    print(f"ERROR: Invalid response: {response}")
+               if len(peer_info) <3 :
+                    print(f"ERROR:Invalid response: {response}")
                     continue
 
                peer_ip = peer_info[1].strip()
@@ -236,118 +233,125 @@ def interface_menu(client, p2p_socket, username):
                     conn_peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     conn_peer_socket.connect((peer_ip, peer_port))
                     #print(f"Successfully connected to peer at {peer_ip}: {peer_port}! Let's chat!")
+                    # CHANGED 
+                    # FROM
                     handle_a_peer_chat(conn_peer_socket, username, peer_name=name, send_handshake=True)
+                    # TO
+                    #threading.Thread(target=handle_a_peer_chat, args=(conn_peer_socket, username, peer_name=name, True), daemon=True).start()
+
                     # receiving messages from a peer while concurrently :) waitingg
                     #threading.Thread(target=peer_chat, args=(p2p_socket, ), daemon=True).start()
 
                     #peer_send_msg(p2p_socket)
                except Exception as e:
                     print(e)
-                    print("Could not connect to peer.")
+                    print("ERROR:Could not connect to peer.")
+
+
+          elif choice == "2":
+               client.sendall("LIST_USERS".encode())
+
+               try:
+                    response = server_msg_queue.get(timeout=5)
+                    parts = response.split(":")
+                    if parts[0] == "ACK":
+                         print("\nONLINE Users:")
+                         print(parts[2])
+
+               except queue.Empty:
+                    print("ERROR:No response from server")
+
 
           #send to the server to continue with the creation of the group
-          elif choice == "2":
-               client.sendall(choice.encode())
+          elif choice == "3":
+          
                groupName = input("Enter the name of the new group: \n")
                members= input("Enter a comma seperared list of members (e.g Zama,Khanyi): \n") 
+               client.sendall(f"CREATE_GROUP:{groupName}:{members}:{username}".encode())
 
-               client.sendall(groupName.encode())
-               client.sendall(members.encode())
-
-          elif choice == "3":
-               client.sendall(choice.encode())
-               # we want to wait for the server's joined reply before looping
                try:
-                    reply = server_msg_queue.get(timeout=5)
-                    parts = reply.split(":",1)
-                    print(parts[1] if len(parts) == 2 else reply)
-               except queue.Empty :
-                    #print("No reply from server")
-                    pass
+                    response = server_msg_queue.get(timeout=5)
+                    print(response)
+               except queue.Empty:
+                    print("ERROR:No response from server")
+
+          #send to the server to continue with add the member to the group   
+          elif choice=="4":
+               groupName = input("Enter the name of the group you would like to join: \n")  
+               client.sendall(f"JOIN_GROUP:{groupName}:{username}".encode())
+
+               try:
+                    response = server_msg_queue.get(timeout=5)
+                    print(response)
+               except queue.Empty:
+                    print("ERROR:No response from server")
+
+
+          # elif choice == "3":
+          #      client.sendall(choice.encode())
+          #      # we want to wait for the server's joined reply before looping
+          #      try:
+          #           reply = server_msg_queue.get(timeout=5)
+          #           parts = reply.split(":",1)
+          #           print(parts[1] if len(parts) == 2 else reply)
+          #      except queue.Empty :
+          #           #print("No reply from server")
+          #           pass
 
 
           #send message to groups
-          elif choice =="4":
-               client.sendall(choice.encode())
-               print("im back")
-               send_group_message(client, username)
-               
+          elif choice =="5":
+               group = input("Enter group name you woud like to chat in:\n")
+               print("Type 'return' to go back")
 
-          elif choice == "5":
-               client.sendall(choice.encode())
+               while True:
+                    message = input()
+                    if message.lower() == "return":
+                         break
+                    if message !="":
+                         client.sendall(f"GROUP_MSG:{group}:{message}".encode())
                
+               try:
+                    response = server_msg_queue.get(timeout=5)
+                    print(response)
+               except queue.Empty:
+                    print("ERROR:No response from server")
+
+
+          #all the client to exit the specified group
+          elif choice == "6":
+               group = input("Enter the name of the group you would like to exit:\n")
+               client.sendall(f"EXIT_GROUP:{group}".encode())  
+
+               try:
+                    response = server_msg_queue.get(timeout=5)
+                    print(response)
+               except queue.Empty:
+                    print("ERROR:No response from server")
+
+
+          #Exit chat system and disconnect from the server
+          elif choice == "7":
                print("Goodbye! Hope to see you soon!")
-               break
+               client.sendall(f"EXIT_CHAT_SYSTEM".encode())
+     
           # ACCEPT INCOMING PEER CONN
           # INCOMING CONN IS HANDLED HERE ON THE MAIN THREAD SO THERE IS ONLY EVER ONE INPUT() AT A TIME
-          elif choice == "5":
+          elif choice == "8.":
                try:
                     peer, peer_name = incoming_peer_queue.get_nowait()
                     handle_a_peer_chat(peer, username, peer_name=peer_name, send_handshake=False)
                except queue.Empty:
-                    print("No pending incoming connections.")
+                    print("ERROR:No pending incoming connections.")
              
           else:
-               #print("Invalid choice!")
+               print("Invalid choice!")
                continue
 
-def getGroups(client):
-     client.sendall("GET_GROUPS".encode())
-     data = server_msg_queue.get(timeout=5)
-     if isinstance(data, bytes):
-        data = data.decode()
-
-     groups = json.loads(data)
-     print("We aare done")
-     return groups
-              
-
-    # include the part where we ask the group name       
-def send_group_message(client, username):
-     print("\nWELCOME TO OUR GROUP CHATS!!")
-     groupName = input("Enter the group name to chat in: ")
-     exists = False
-     updatedGroup = getGroups(client)
-     print("done")
-     print(len(updatedGroup))
-     print("hey")
-     
-
-     for x in range(len(updatedGroup)):
-          print("we are inside")
-          if groupName == updatedGroup[x][0]:
-               print("found group")
-               exists = True
-
-     print("hey")
-     if exists:
-          print("Type 'return' to go back to the menu\n\nStart typing message!")
-
-          while True:
-               message = input() # you write
-
-               if message.lower() == 'return': # exit
-                    CHAT_SERVER.send_to_group(username+ " has exited "+ groupName, groupName)
-                    break
-               if message != "":
-                    CHAT_SERVER.send_to_group(message, groupName)
-     else:
-
-          print("The group does not exist.")
-
-
-#NEEDS TO BE DONE
-def sendFile(client, filepath):
-     with open(filepath, "rb") as f:
-          data = f.read()
-     fileName = filepath
-     fileSize = len(data)
-
-     #client.sendall(header.encode()) #??
-     client.sendall(data)
 
 #Main function
 def main():
+
      #create the socket object
      #AF_INET: Use IPV4 addresses(home address of a computer)
      #SOCK_STREAM: We are going to be using TCP packets for communication
@@ -359,7 +363,7 @@ def main():
           print(f"Connection is successful to server: {HOST} {PORT}!")
      except Exception as e:
           print(e)
-          print("Connection is unsuccessful!")
+          print("ERROR:Connection is unsuccessful!")
           return
 
 
@@ -372,7 +376,7 @@ def main():
           
      except Exception as e:
           print(e)
-          print("Could not bind the socket!")
+          print("ERROR:Could not bind the socket!")
           return
 
 
@@ -400,7 +404,7 @@ def main():
                     incoming_peer_queue.put((peer, peer_name))
 
                     print(f"\n***{peer_name} wants to start a chat with you! \nIncoming connection with peer: {address[0]} {address[1]}...")  
-                    print("Type '5' to accept the invitation.")
+                    print("Type '5' to accept the invitation.\n")
                     # new change
                     print("Choose your action: ", end="", flush=True)                       
                     #handle_a_peer_chat(peer, CURRENT_USERNAME, peer_name=peer_name) # we start the full peer session without a thread so that it runs on the main thread
