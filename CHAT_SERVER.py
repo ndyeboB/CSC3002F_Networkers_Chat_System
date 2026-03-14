@@ -4,8 +4,13 @@ import threading
 
 
 HOST = "127.0.0.1"
-PORT = 1234 # the range of use is 0 to 65
- # lets set a limit on the amount of people that can be a chat -- later we can build more capacity in our system
+TCP_PORT = 1234 # the range of use is 0 to 65
+UDP_PORT = 1235
+
+#creation of the udp socket
+udp_socket_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+
 
 class CHAT_SERVER:
     online_clients = [] #list of all clients that are curently online and connected to the server
@@ -54,10 +59,11 @@ def server_listening(client, username): # responsible of collecting the message
             peer_ip = None
             peer_port = None
 
-            for user in CHAT_SERVER.online_clients:
-                if user[0] == target:
-                    peer_ip = user[2]
-                    peer_port = user[3]
+            # you changed here tooo
+            for username, client_sock, ip, P2Ptcp_port, udp_port in CHAT_SERVER.online_clients:
+                if username == target:
+                    peer_ip = ip
+                    peer_port = P2Ptcp_port
                     break
                     
             if peer_ip:
@@ -120,7 +126,7 @@ def server_listening(client, username): # responsible of collecting the message
                     CHAT_SERVER.groups[groupname].append(username)
                     client.sendall(f"ACK:Joined group: {groupname}".encode())
                 else:
-                    client.sendall(f"ERROR:You are already in the group")
+                    client.sendall(f"ERROR:You are already in the group".encode())
 
         elif message.startswith("EXIT_GROUP:"):
             _,groupname = message.split(":",1)
@@ -150,18 +156,31 @@ def server_listening(client, username): # responsible of collecting the message
                             sock.sendall(f"<{groupname}>:{username}: {group_message}".encode())
                         except:
                             pass
-
             except:
                 client.sendall("ERROR:Invalid group message".encode())
+        #Not sure how yest, we will just figure it out as we code neh
+        #server recieves communication from the server of a request to send a file
+        elif message.startswith("FILE:"):
+            _, filenamme, filesize_string = message.split(":", 2)
+            filesize = int(filesize_string)
 
+            #read the actua file bytes
+            file_data = b""     # empty container that will store the binary data 
+            while len(file_data) < filesize:
+                chunk = client.recv(min(4096, filesize - len(file_data)))
 
+                if not chunk:
+                    break
+                file_data += chunk
 
+            # forward the file_data to group members
+            send_to_default_group(message, file_data)
 
         else:
             if username in CHAT_SERVER.groups["default"]:
                 group_message = f"{username}: {message}"
                 
-                send_to_default_group(group_message)
+                send_to_default_group(group_message, file_data=None)
             else:
                 client.sendall("SERVER:Join the default group first (option 2)".encode())
 
@@ -177,7 +196,9 @@ def lets_send_message_to_client(client, message):
 
 # needs to be further implemented so we first initiate a seperate group chat to send to everyone
 def lets_send_message_to_everyone(message, exclude_username=None): 
-        for username, client_socket, ip, peer_port in CHAT_SERVER.online_clients:
+        
+        for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
+
             if username != exclude_username:   # this ensures that we broadcast to everyone except the user who sent it
                 try:
                     client_socket.sendall(message.encode())
@@ -186,14 +207,58 @@ def lets_send_message_to_everyone(message, exclude_username=None):
 
         
 
-def send_to_default_group(message):
-    for username, client_socket, ip, peer_port in CHAT_SERVER.online_clients:
+def send_to_default_group(message, file_data=None):
+    for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
         if username in CHAT_SERVER.groups["default"]:
             try:
                 client_socket.sendall(message.encode()) # works the same way as the function lets_send_messages_to_client
+                
+                if file_data:  # for file sharing: send the file data
+                    client_socket.sendall(file_data)
             except:
                 pass
 
+# listens for UDP notifications from clients
+def listening_for_theUPD():
+    while True:
+        data, address = udp_socket_server.recvfrom(2048)
+        message = data.decode()
+
+        message_parts = message.split(':')
+
+        # is this part that important eyii
+        if len(message_parts) != 3:
+            print("Invalid UDP message received:", message)
+            continue
+
+        event, sender, target = message_parts
+
+        print("UDP received:", message)
+        
+        pass_notification(event, sender, target)
+
+
+#forward the udp notification to the client 
+def pass_notification(event, sender, target):
+    
+    for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
+
+        if not udp_port or username == sender:
+           continue
+
+        #peer notification
+        if username == target:
+            try:
+              udp_socket_server.sendto(f"{event}:{sender}".encode(), (ip, udp_port))
+            except:
+                pass
+
+        #group notification
+        elif target in CHAT_SERVER.groups and username in CHAT_SERVER.groups[target]:
+            try:
+              udp_socket_server.sendto(f"{event}: {sender}".encode(), (ip, udp_port))
+            except:
+                pass
 # main function
 def main():
     # CONFIGURING OUR SERVER
@@ -203,12 +268,16 @@ def main():
 
     try:
         # attach the server with an address in the form of host IP and port
-        server.bind((HOST, PORT))
-        print(f"Running the server on {HOST} {PORT}")
+        server.bind((HOST, TCP_PORT))
+        print(f"Running the server on {HOST} {TCP_PORT}")
+
+        udp_socket_server.bind((HOST, UDP_PORT)) #udp for notifications
+
+        threading.Thread(target=listening_for_theUPD, daemon=True).start()
         
 
     except:
-        print(f"ERROR! The server cannot bind to host: {HOST} and port: {PORT}.")
+        print(f"ERROR! The server cannot bind to host: {HOST} and port: {TCP_PORT}.")
         return
 
     server.listen()
@@ -220,9 +289,25 @@ def main():
         # address = represents where client comes from
         print(f"Successfully connected to client: {address[0]} {address[1]}") # this port is the client's tcp conn to the server, not the listening port
 
-        data = client.recv(2048).decode('utf-8') # wait for the username that yo may receive from the client
-        username, peer_port = data.split(":")
+        data = client.recv(2048).decode('utf-8') # wait for the username that you may receive from the client
+
+        parts = data.split(":")
+        
+        if len(parts) == 2:
+            username, peer_port = parts
+            udp_port = None
+        elif len(parts) == 3:
+            username, peer_port, udp_port = parts
+        else:
+            print(f"Invalid login data: {data}")
+            client.close()
+            continue
+        
+
         peer_port = int(peer_port)
+        if udp_port:
+            udp_port = int(udp_port)
+
 
         if username == "":
             print("ERROR:The username given by the client is empty!")
@@ -235,13 +320,16 @@ def main():
             if user[0] == username:
                 username_used = True
                 break
+
         if username_used: # if the username has been found
             client.sendall("ERROR:Username has been already taken".encode())
             client.close()
             continue # makes it got back to waiting...
 
-        
-        CHAT_SERVER.online_clients.append((username, client, address[0], peer_port)) # we add the client to list
+        if udp_port:
+            CHAT_SERVER.online_clients.append((username, client, address[0], peer_port, udp_port))
+        else:
+           CHAT_SERVER.online_clients.append((username, client, address[0], peer_port, None)) # we add the client to list
     
         client.sendall("\nACK:Login successful!\n".encode()) # we tell the client login is successful!
         

@@ -3,16 +3,18 @@
 import socket
 import threading
 import queue
+import os
+import time
 
 
 HOST = '127.0.0.1'   #Server IP address (IPv4)
-PORT = 1234              #Port number the server is listening on
-
-
-
+TCP_PORT = 1234              #Port number the server is listening on
+UDP_PORT = 1235
 
 
 CURRENT_USERNAME = None
+last_sent_typingPacket = 0 #used as a timestamp for the last sent typing packet
+inactivity_time = None   # use it as countdown timer for when theres no typing activity happening from the client
 
 server_msg_queue = queue.Queue()
 
@@ -32,6 +34,26 @@ def listening_For_Messages(client):
 
                if (message.startswith("ACK:") or message.startswith("ERROR:")): 
                     server_msg_queue.put(message)
+
+               elif message.startswith("FILE:"):
+                    _, filename, filesize_String = message.split(":", 2)
+                    filesize = int(filesize_String)
+
+                    #save the file to a certain directory through a specified path- if the directory does not exist - the system will just make one
+                    os.makedirs("downloads", exist_ok = True)
+                    filepath = os.path.join("downloads", filename)
+
+                    #reading and writing of the chunks of data from server
+                    with open(filepath, "wb") as f:
+                         current_bytes = 0       #number of chunks of data that we have recieved  so far
+                         while current_bytes < filesize:
+                              chunk = client.recv(min(4096, filesize - current_bytes))
+                              if not chunk:
+                                   break
+                              f.write(chunk)
+                              current_bytes += len(chunk)
+                         print(f"\nFile received and saved to: {filepath}")
+
                else:
                     parts = message.split(":",1)
                     if len(parts) ==2:
@@ -101,7 +123,7 @@ def handle_a_peer_chat(p2p_socket, username, peer_name="peer", send_handshake=Fa
      peer_session_active.set()    # RESUME the menu loop
      print("\nPeer session ended. Returning to menu...")
 
-def server_communication(client, p2p_socket):
+def server_communication(client, p2p_socket, udp_port):
 #Handles initial communication with the server, including sending the userID and starting the listening thread.
      while True:
           
@@ -109,7 +131,7 @@ def server_communication(client, p2p_socket):
           if userID != '':
                
                peer_port = p2p_socket.getsockname()[1]
-               client.sendall(f"{userID}:{peer_port}".encode())
+               client.sendall(f"{userID}:{peer_port}:{udp_port}".encode())  #send both ports
                
                
                receiving_msg = client.recv(2048).decode() # the client receives the server responce about login success/error
@@ -128,6 +150,8 @@ def server_communication(client, p2p_socket):
           #start the listening thread after login success
      
      threading.Thread(target=listening_For_Messages, args=(client, ), daemon=True).start()
+
+     threading.Thread(target=receiving_theUDP, daemon=True).start()
      
      
      interface_menu(client, p2p_socket, userID) # after login success, show the menu
@@ -306,7 +330,7 @@ def interface_menu(client, p2p_socket, username):
      
           # ACCEPT INCOMING PEER CONN
           # INCOMING CONN IS HANDLED HERE ON THE MAIN THREAD SO THERE IS ONLY EVER ONE INPUT() AT A TIME
-          elif choice == "9.":
+          elif choice == "9":
                try:
                     peer, peer_name = incoming_peer_queue.get_nowait()
                     handle_a_peer_chat(peer, username, peer_name=peer_name, send_handshake=False)
@@ -323,18 +347,100 @@ def interface_menu(client, p2p_socket, username):
 def send_group_message(client):
      group = input("Enter group name: ")
      print("Type 'return' to go back")
+     print("Type '/file' to send a file\n")
 
      while True:
           message = input()
           if message.lower() == "return":
                break
           if message !="":
-               client.sendall(f"GROUP_MSG:{group}:{message}".encode())
+               if message == "/file":  #option to allow user to file share
+                    filepath = input("Enter the filepath: ")
+                    send_file(client, filepath)
+               else:
+                    input_field(message, CURRENT_USERNAME, "grou") #come back here 
+                    client.sendall(f"GROUP_MSG:{group}:{message}".encode())
 
+#This function is called when the user wants to send a file to another user
+def send_file(client, filepath):
+     try:
+          #extract the file name and size from the filepath provided by the user
+          filename = os.path.basename(filepath)
+          filesize = os.path.getsize(filepath)
+
+          #send the metadata to the server
+          client.sendall(f"FILE:{filename}:{filesize}".encode())
+
+          #sending of the chunks of data in bytes
+          with open(filepath, "rb") as f:
+               while chunk := f.read():
+                    client.sendall(chunk)
+          print(f"File '{filename}' send successfully!")
+     except Exception as e:
+          print(f"Error sending file: {e}")
+
+#send the udp packet from client to sever
+def send_udp_notification(message):
+     udp_socket_client.sendto(message.encode(), (HOST, UDP_PORT))
+
+#explain
+def cancel_timer():
+     global inactivity_time
+     if inactivity_time:
+          inactivity_time.cancel()
+
+#called every time a user types a character
+def input_field(message, sender, target):
+     global last_sent_typingPacket, inactivity_time
+
+     #if the input field/box is empty, send the 'stopped typing' notification immediately
+     if len(message) == 0:
+          send_udp_notification(f"Stopped_typing:{sender}:{target}")
+          return
+     
+     #used to send the typing notifcation every 2 seconds
+     current = time.time()
+     if current - last_sent_typingPacket > 2:
+          send_udp_notification(f"typing:{sender}:{target}")
+          last_sent_typingPacket = current
+
+     #reset the countdown if there is no activity in about 3 seconds
+     reset_InactivityTimer(sender, target)
+
+#send the 'stopped typing' packet
+def user_stoppedTyping(sender, target):
+     send_udp_notification(f"Stopped_typing:{sender}:{target}")
+
+def reset_InactivityTimer(sender, target):
+     global inactivity_time
+     if inactivity_time:
+          inactivity_time.cancel() #if a timer already exists, cancel it
+     inactivity_time = threading.Timer(3.0, user_stoppedTyping, args=(sender, target)) # creates a new timer if the user does not type for 3 seconds - we then call user_StoppedTyping()
+     inactivity_time.start()
+
+def receiving_theUDP():
+     while True:
+          try:
+               data, address = udp_socket_client.recvfrom(2048)
+               message = data.decode()
+               print(f"UDP received from {address}: {message}")
+               event, sender = message.split(':')
+
+               if event == 'typing':
+                    print(f"{sender} is typign..")
+               elif event == "Stopped_typing":
+                    print(f"{sender} stopped typing")
+          except Exception as e:
+               print(f"UDP receive error: {e}")
+
+#do i even ever call this one
+def clear_typing_notification(sender,):
+     cancel_timer()
+     print(f"{sender} stopped typing")
 
 #Main function
 def main():
-
+     global udp_socket_client
      
 
      #create the socket object
@@ -344,13 +450,17 @@ def main():
 
      #connect to the server(TCP connection)
      try:
-          client.connect((HOST, PORT))
-          print(f"Connection is successful to server: {HOST} {PORT}!")
+          client.connect((HOST, TCP_PORT))
+          print(f"Connection is successful to server: {HOST} {TCP_PORT}!")
      except Exception as e:
           print(e)
           print("ERROR:Connection is unsuccessful!")
           return
 
+     #lets set up our udp socket for notifications
+     udp_socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+     udp_socket_client.bind(("0.0.0.0", 0))  #operating system assigns random port
+     udp_port = udp_socket_client.getsockname()[1]  # get the assigned random port 
 
      
      # lets set up our p2p listening socket
@@ -398,7 +508,7 @@ def main():
                     break
 
      threading.Thread(target=accept_loop, daemon=True).start()
-     server_communication(client, p2p_socket)
+     server_communication(client, p2p_socket, udp_port)
 
 if __name__== '__main__':
     main()
