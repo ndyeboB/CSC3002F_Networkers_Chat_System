@@ -3,6 +3,7 @@
 import socket
 import threading
 import queue
+import json
 from CHAT_SERVER import CHAT_SERVER
 
 
@@ -26,9 +27,13 @@ def listening_For_Messages(client):
                message = client.recv(2048).decode('utf-8')
                if message == '':
                     continue
+               if isinstance(message, str):
+                    if (message.startswith("ACK:") or message.startswith("ERROR:")): 
+                         server_msg_queue.put(message)
 
-               if (message.startswith("ACK:") or message.startswith("ERROR:")): 
+               elif isinstance(message, bytes) and message.startswith("["):
                     server_msg_queue.put(message)
+
                else:
                     parts = message.split(":",1)
 
@@ -36,6 +41,7 @@ def listening_For_Messages(client):
                          print(f"\n[{parts[0]}]: {parts[1]}")
                          print("\n", end="", flush=True) # not a threading problem but a prompting problem
                     else:
+                         print("are u the culprit?")
                          print(f"\n{message}")
                          print("\n", end="", flush=True)
                              
@@ -45,12 +51,12 @@ def listening_For_Messages(client):
                print("Disconnected from the server")
                break
 
-def handleClient(client):
-     while True:
-          data = client.recv(2048)
+#def handleClient(client):
+     #while True:
+          #data = client.recv(2048)
 
-          if not data:
-               break
+          #if not data:
+               #break
 
 #def processMessage that sends to the memebers in the group 
 
@@ -120,7 +126,7 @@ def server_communication(client, p2p_socket):
                
                
                receiving_msg = client.recv(2048).decode() # the client receives the server responce about login success/error
-               
+               print("89-")
                print(receiving_msg) # we take the server response
                
                if receiving_msg.startswith("\nACK"): # if the server ACKnowledged username success
@@ -177,7 +183,6 @@ def peer_chat(p2p_socket, stop_event):
                stop_event.set() #new change
                break
 
-     
 
 
 def interface_menu(client, p2p_socket, username):
@@ -211,6 +216,15 @@ def interface_menu(client, p2p_socket, username):
                     response = server_msg_queue.get(timeout=5) # we wait for the reply via the queue, not via recv() because there would be a race condition. listening_for_Mess will put the reply here
                except queue.Empty:
                     print("No response from server (timeout). Try again")
+                    continue
+
+               if response.startsWith("ERROR"):
+                    print(response)
+                    continue
+
+               peer_info = response.split(":")
+               if len(peer_info)<3:
+                    print(f"ERROR: Invalid response: {response}")
                     continue
 
                peer_ip = peer_info[1].strip()
@@ -254,6 +268,8 @@ def interface_menu(client, p2p_socket, username):
 
           #send message to groups
           elif choice =="4":
+               client.sendall(choice.encode())
+               print("im back")
                send_group_message(client, username)
                
 
@@ -275,27 +291,49 @@ def interface_menu(client, p2p_socket, username):
                #print("Invalid choice!")
                continue
 
-          
+def getGroups(client):
+     client.sendall("GET_GROUPS".encode())
+     data = server_msg_queue.get(timeout=5)
+     if isinstance(data, bytes):
+        data = data.decode()
+
+     groups = json.loads(data)
+     print("We aare done")
+     return groups
+              
 
     # include the part where we ask the group name       
 def send_group_message(client, username):
      print("\nWELCOME TO OUR GROUP CHATS!!")
      groupName = input("Enter the group name to chat in: ")
+     exists = False
+     updatedGroup = getGroups(client)
+     print("done")
+     print(len(updatedGroup))
+     print("hey")
+     
 
-     for x in range(len(CHAT_SERVER.groups)):
-          if groupName == CHAT_SERVER.groups[x][0]:
-               print("Type 'return' to go back to the menu\n\nStart typing message!")
+     for x in range(len(updatedGroup)):
+          print("we are inside")
+          if groupName == updatedGroup[x][0]:
+               print("found group")
+               exists = True
 
-               while True:
-                    message = input() # you write
+     print("hey")
+     if exists:
+          print("Type 'return' to go back to the menu\n\nStart typing message!")
 
-                    if message.lower() == 'return': # exit
-                         CHAT_SERVER.send_to_group(username+ " has exited "+ groupName, groupName)
-                         break
-                    if message != "":
-                         CHAT_SERVER.send_to_group(message, groupName)
-          else:
-               print("The group does not exist.")
+          while True:
+               message = input() # you write
+
+               if message.lower() == 'return': # exit
+                    CHAT_SERVER.send_to_group(username+ " has exited "+ groupName, groupName)
+                    break
+               if message != "":
+                    CHAT_SERVER.send_to_group(message, groupName)
+     else:
+
+          print("The group does not exist.")
 
 
 #NEEDS TO BE DONE

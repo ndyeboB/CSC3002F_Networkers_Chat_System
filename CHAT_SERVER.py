@@ -1,6 +1,7 @@
 # we are importing the required libaries
 import socket
 import threading
+import json
 
 
 HOST = "127.0.0.1"
@@ -13,6 +14,18 @@ class CHAT_SERVER:
 
     #creates the 2D array to store the groups
     groups= [["Nothing"]*2 for x in range(1)]
+
+    @staticmethod         
+    def groupExistence(groupName):
+        print(CHAT_SERVER.groups)
+        print("="+CHAT_SERVER.groups[0][0]+"=")
+        Found = False
+        for x in range(len(CHAT_SERVER.groups)):
+            if groupName == CHAT_SERVER.groups[x][0]:
+                Found = True
+            else:
+                continue
+        return Found
 
 
 def work_with_client(client, username):
@@ -110,7 +123,9 @@ def server_listening(client, username): # responsible of collecting the message
             send_to_group("You have been added to "+ groupName, groupName)
             client.sendall(("Group "+ groupName+ " was successfully created.\n").encode())
 
-
+        elif message == "4":
+            handleClient(client)
+            
 
         elif message =="5":
             client.sendall("SERVER:Exiting chat...".encode())
@@ -136,8 +151,7 @@ def server_listening(client, username): # responsible of collecting the message
         #         client.sendall("SERVER:Join the default group first (option 2)".encode())
 
 
-           
-            
+
     
     
 # this is to send a message to a single client
@@ -165,9 +179,10 @@ def lets_send_message_to_everyone(message, exclude_username=None):
 
 def send_to_group(message, groupName):
     #for username, client_socket in CHAT_SERVER.online_clients:
-    for i in range(len(CHAT_SERVER.groups)):
-        if groupName == CHAT_SERVER.groups[i][0]:
-            for user in CHAT_SERVER.groups[i][1]:
+    groups= getGroup()
+    for i in range(len(groups)):
+        if groupName == groups[i][0]:
+            for user in groups[i][1]:
                 for username, client_socket, ip, peer_port in CHAT_SERVER.online_clients:
                     if user == username:
                         try:
@@ -175,6 +190,22 @@ def send_to_group(message, groupName):
                         except:
                             pass
 
+def handleClient(client):
+    while True:
+        request = client.recv(2048).decode()
+        if request == "GET_GROUPS":
+            print("hey7")
+            groupArray = getGroup()
+            print(groupArray)
+            data = json.dumps(groupArray)
+
+            client.sendall(data.encode())
+            print("finished handle")
+            break
+
+
+def getGroup():
+    return CHAT_SERVER.groups
 
 # main function
 def main():
