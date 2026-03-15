@@ -77,18 +77,20 @@ def server_listening(client, username): # responsible of collecting the message
 
         #Choice 3: Create a new group
         elif message.startswith("CREATE_GROUP:"):
-            _,groupname, members, creator = message.split(";",3)
+            _,groupname, members, creator = message.split(":",3)
+            print(members)
             allMembers = members.strip().split(",")
+            print(allMembers)
             for member in allMembers:
                 found = False
-                for x in range(len(CHAT_SERVER.online_clients)):
-                    if member == CHAT_SERVER.online_clients[x][0]:
+                for user, sock, ip, port,udp_port in CHAT_SERVER.online_clients:
+                    if member == user:
                         found = True
                         continue
                        
-            if not found:
-                client.sendall(member+ " could not be added to the group".encode())
-                allMembers.remove(member)
+                # if not found:
+                #     client.sendall(f"ERROR: {member} could not be added to the group".encode())
+                #     allMembers.remove(member)
 
             if creator not in allMembers:
                 allMembers.append(creator)
@@ -97,10 +99,11 @@ def server_listening(client, username): # responsible of collecting the message
                 client.sendall(f"ERROR:Group {groupname} already exists.".encode())
             else:
                 #We add the group to the dictionary
-                CHAT_SERVER.groups.append(groupname)
-                CHAT_SERVER.groups[groupname].append(allMembers)
+                CHAT_SERVER.groups[groupname] = allMembers
+                #CHAT_SERVER.groups[groupname].append(allMembers)
 
-            send_to_group("You have been added to "+ groupname, groupname)
+            send_to_group(f"SERVER:You have been added to {groupname}", groupname)
+            print(CHAT_SERVER.groups)
             client.sendall(f"ACK:Group {groupname} has been successfully created.".encode())
 
 
@@ -113,12 +116,12 @@ def server_listening(client, username): # responsible of collecting the message
             else:
                 if newMember not in CHAT_SERVER.groups[groupname]:
                     CHAT_SERVER.groups[groupname].append(newMember)
-                    send_to_group(f"{newMember} has been added to the group {groupname}", groupname)   
+                    send_to_group(f"SERVER: {newMember} has been added to the group {groupname}", groupname)   
                     client.sendall(f"ACK:You have been successfully added to the group {groupname}".encode())
                 else:
                     client.sendall(f"ACK:You are already in the group {groupname}".encode())
                 
-                    client.sendall(f"ERROR:You are already in the group".encode())
+                    client.sendall("ERROR:You are already in the group".encode())
 
 
         #Choice 5: Send message to a group
@@ -131,10 +134,10 @@ def server_listening(client, username): # responsible of collecting the message
                 if username not in CHAT_SERVER.groups[groupname]:
                     client.sendall(f"ERROR: You are not in the group {groupname}".encode())
 
-                for user, sock, ip, port, in CHAT_SERVER.online_clients:
+                for user, sock, ip, port,udp_port in CHAT_SERVER.online_clients:
                     if user in CHAT_SERVER.groups[groupname]:
                         try:
-                            sock.sendall(f"<{groupname}>:{username}: {text}".encode())
+                            sock.sendall(f"<{groupname}>\n{username}: {text}".encode())
                         except:
                             pass     
             except:
@@ -208,39 +211,36 @@ def lets_send_message_to_everyone(message, exclude_username=None):
 
 def send_to_group(message, groupName, file_data=None):
     groups= getGroup()
-    for group, members in groups:
-        #look for specified group
-        if groupName in group:
-            for user in members:
-                for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
-                    if user == username:
-                        try:
-                            client_socket.sendall(message.encode())
+    if groupName in groups.keys():
+        members = groups[groupName]
 
-                            if file_data:   #for file sharing: send the file data
-                                client_socket.sendall(file_data)
-                                  
-                        except:
-                            pass
+    for member in members:
+            for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
+                if member == username:
+                    try:
+                        client_socket.sendall(message.encode())
 
-# def handleClient(client):
-#     while True:
-#         request = client.recv(2048).decode()
-#         if request == "GET_GROUPS":
-#             print("hey7")
-#             groupArray = getGroup()
-#             print(groupArray)
-#             data = json.dumps(groupArray)
-
-#             client.sendall(data.encode())
-#             print("finished handle")
-#             break
+                        if file_data:   #for file sharing: send the file data
+                            client_socket.sendall(file_data)
+                    except:
+                        pass
+        
 
 
 def getGroup():
     return CHAT_SERVER.groups
 
 
+def send_to_default_group(message, file_data=None):
+    for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
+        if username in CHAT_SERVER.groups["default"]:
+            try:
+                client_socket.sendall(message.encode()) # works the same way as the function lets_send_messages_to_client
+                
+                if file_data:  # for file sharing: send the file data
+                    client_socket.sendall(file_data)
+            except:
+                pass
 
 # listens for UDP notifications from clients
 def listening_for_theUPD():

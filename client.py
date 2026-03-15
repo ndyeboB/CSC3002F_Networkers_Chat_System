@@ -1,10 +1,8 @@
-
-
 import socket
 import threading
 import queue
 import json
-from CHAT_SERVER import CHAT_SERVER
+import CHAT_SERVER
 import os
 import time
 
@@ -39,9 +37,11 @@ def listening_For_Messages(client):
 
                if message == '':
                     continue
-               if isinstance(message, str):
-                    if (message.startswith("ACK:") or message.startswith("ERROR:")): 
+               if (isinstance(message, str)):
+                    if (message.startswith("ACK:") or message.startswith("ERROR:")):
                          server_msg_queue.put(message)
+                    else:
+                         print(message) 
 
                elif isinstance(message, bytes) and message.startswith("["):
                     server_msg_queue.put(message)
@@ -65,9 +65,9 @@ def listening_For_Messages(client):
                               current_bytes += len(chunk)
                          print(f"\nFile received and saved to: {filepath}")
 
+               
                else:
                     parts = message.split(":",1)
-
                     if len(parts) ==2:
                          print(f"\n[{parts[0]}]: {parts[1]}")
                          print("\n", end="", flush=True) # not a threading problem but a prompting problem
@@ -252,7 +252,7 @@ def peer_chat(p2p_socket, stop_event):
                     
           except:
                
-               print(f"\nTalk soon!.")
+               print(f"\nTalk soon! Type 'quit'!.")
                stop_event.set() #new change
                break
 
@@ -350,8 +350,10 @@ def interface_menu(client, p2p_socket, username):
                try:
                     response = server_msg_queue.get(timeout=5)
                     print(response)
+
                except queue.Empty:
                     print("ERROR:No response from server")
+             
 
           #send to the server to continue with add the member to the group   
           elif choice=="4":
@@ -389,11 +391,11 @@ def interface_menu(client, p2p_socket, username):
                     if message !="":
                          client.sendall(f"GROUP_MSG:{group}:{message}".encode())
                
-               try:
-                    response = server_msg_queue.get(timeout=5)
-                    print(response)
-               except queue.Empty:
-                    print("ERROR:No response from server")
+               # #try:
+               #      #response = server_msg_queue.get(timeout=5)
+               #      #print(response)
+               # except queue.Empty:
+               #      print("ERROR:No response from server")
 
 
           #all the client to exit the specified group
@@ -426,8 +428,6 @@ def interface_menu(client, p2p_socket, username):
           else:
                print("Invalid choice!")
                continue
-
-          
 
           
 def send_group_message(client):
