@@ -31,6 +31,12 @@ def listening_For_Messages(client):
      while True:
           try: 
                message = client.recv(2048).decode('utf-8')
+
+               if message.startswith("SERVER:Exiting chat"): #exiting the sysyem
+                    client.close()
+                    os._exit(0)
+
+
                if message == '':
                     continue
                if isinstance(message, str):
@@ -169,7 +175,6 @@ def server_communication(client, p2p_socket, udp_port):
                
                
                receiving_msg = client.recv(2048).decode() # the client receives the server responce about login success/error
-               print("89-")
                print(receiving_msg) # we take the server response
                
                if receiving_msg.startswith("\nACK"): # if the server ACKnowledged username success
@@ -407,6 +412,7 @@ def interface_menu(client, p2p_socket, username):
           elif choice == "7":
                print("Goodbye! Hope to see you soon!")
                client.sendall(f"EXIT_CHAT_SYSTEM".encode())
+               break
      
           # ACCEPT INCOMING PEER CONN
           # INCOMING CONN IS HANDLED HERE ON THE MAIN THREAD SO THERE IS ONLY EVER ONE INPUT() AT A TIME

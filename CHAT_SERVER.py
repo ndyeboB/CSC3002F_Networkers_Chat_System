@@ -43,14 +43,6 @@ def server_listening(client, username): # responsible of collecting the message
         if message =='':
             continue
 
-        if message == "EXITING":
-
-            if username in CHAT_SERVER.groups["default"]:
-                CHAT_SERVER.groups["default"].remove(username)
-            grp_broadcast = "SERVER: "+f"{username} has left the default group. Goodbye {username}!"
-            lets_send_message_to_everyone(grp_broadcast, exclude_username=username)
-            continue
-
         # Choice 1: Connect to friend (peer)
         elif message.startswith("GET_PEER:"):
             
@@ -128,17 +120,6 @@ def server_listening(client, username): # responsible of collecting the message
                 
                     client.sendall(f"ERROR:You are already in the group".encode())
 
-        elif message.startswith("EXIT_GROUP:"):
-            _,groupname = message.split(":",1)
-            if groupname not in CHAT_SERVER.groups:
-                client.sendall("ERROR:Group not found".encode())
-
-            else:
-                if username in CHAT_SERVER.groups[groupname]:
-                    CHAT_SERVER.groups[groupname].remove(username)
-                    client.sendall(f"ACK:Exited group: {groupname}".encode())
-                else:
-                    client.sendall("ERROR:You are not in the group".encode())
 
         #Choice 5: Send message to a group
         elif message.startswith("GROUP_MSG:"):
@@ -193,15 +174,18 @@ def server_listening(client, username): # responsible of collecting the message
         elif message.startswith("EXIT_CHAT_SYSTEM"):
             client.sendall("SERVER:Exiting chat...".encode())
 
-            for user, client_socket, ip, peer_port in CHAT_SERVER.online_clients:
+            for user, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
                 if user == username:
-                    CHAT_SERVER.online_clients.remove((user, client_socket, ip, peer_port))
+                    CHAT_SERVER.online_clients.remove((user, client_socket, ip, peer_port, udp_port))
                     break
 
             for members in CHAT_SERVER.groups.values():
                 if username in members:
                     members.remove(username)
             lets_send_message_to_everyone(f"{username} has left the chat system.", username)
+
+            client.close()
+            break
             
 
     
