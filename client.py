@@ -1,17 +1,3 @@
-# ============================================================
-# client.py  —  Networkers Chat  (Stage 3)
-# Full tkinter GUI — replaces the terminal menu entirely.
-#
-# Features:
-#   - Login screen with error feedback
-#   - Sidebar: live online-users list, my-groups list, action buttons
-#   - Group chat: multi-group dropdown, message display, file send
-#   - Peer chat: separate Toplevel window per peer (multiple simultaneous)
-#   - Peer file sharing (P2P) with 📎 button
-#   - UDP typing indicators ("Alice is typing…") in both group + peer windows
-#   - ACK / ERROR messages shown inline with colour coding
-#   - Auto-refresh user list on every SERVER: notification
-# ============================================================
 
 import socket
 import threading
@@ -21,7 +7,7 @@ import time
 import tkinter as tk
 from tkinter import scrolledtext, simpledialog, messagebox, filedialog, ttk
 
-HOST     = '127.0.0.1'  # must be replaced 
+HOST     = '127.0.0.1'  # !!!!must be replaced with the IP address of the laptop that will host the SERVER!!!!
 TCP_PORT = 1234
 UDP_PORT = 1235
 
@@ -82,7 +68,7 @@ class NetworkersChatApp:
         # Logo / title
         tk.Label(self._login_frame, text="◈  NETWORKERS",
                  font=("Arial", 26, "bold"), fg=GREEN, bg=BG).pack(pady=(0, 4))
-        tk.Label(self._login_frame, text="A multi-paradigm networked chat system",
+        tk.Label(self._login_frame, text="WhatsApp? We do it better 😎",
                  font=("Arial", 10), fg=MUTED, bg=BG).pack(pady=(0, 28))
 
         # Card
