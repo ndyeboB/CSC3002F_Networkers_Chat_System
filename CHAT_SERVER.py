@@ -187,7 +187,7 @@ def server_listening(client, username): # responsible of collecting the message
                 file_data += chunk
 
             # forward the file_data to group members
-            send_to_default_group(message, file_data)
+            send_to_group(message, groupname, file_data)
 
         #Choice 7: The user leaves the whole chat system 
         elif message.startswith("EXIT_CHAT_SYSTEM"):
@@ -222,16 +222,20 @@ def lets_send_message_to_everyone(message, exclude_username=None):
                 except:
                     pass
 
-def send_to_group(message, groupName):
+def send_to_group(message, groupName, file_data=None):
     groups= getGroup()
     for group, members in groups:
         #look for specified group
         if groupName in group:
             for user in members:
-                for username, client_socket, ip, peer_port in CHAT_SERVER.online_clients:
+                for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
                     if user == username:
                         try:
                             client_socket.sendall(message.encode())
+
+                            if file_data:   #for file sharing: send the file data
+                                client_socket.sendall(file_data)
+                                  
                         except:
                             pass
 
@@ -251,16 +255,8 @@ def send_to_group(message, groupName):
 
 def getGroup():
     return CHAT_SERVER.groups
-def send_to_default_group(message, file_data=None):
-    for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
-        if username in CHAT_SERVER.groups["default"]:
-            try:
-                client_socket.sendall(message.encode()) # works the same way as the function lets_send_messages_to_client
-                
-                if file_data:  # for file sharing: send the file data
-                    client_socket.sendall(file_data)
-            except:
-                pass
+
+
 
 # listens for UDP notifications from clients
 def listening_for_theUPD():
