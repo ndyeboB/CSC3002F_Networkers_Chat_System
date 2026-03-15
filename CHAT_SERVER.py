@@ -229,29 +229,18 @@ def send_to_group(message, groupName, file_data=None):
     groups= getGroup()
     if groupName in groups.keys():
         members = groups[groupName]
-    for group, members in groups:
-        #look for specified group
-        if groupName in group:
-            for user in members:
-                for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
-                    if user == username:
-                        try:
-                            client_socket.sendall(message.encode())
 
-                            if file_data:   #for file sharing: send the file data
-                                client_socket.sendall(file_data)
-                                  
-                        except:
-                            pass
-
-        for member in members:
+    for member in members:
             for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
                 if member == username:
                     try:
-
                         client_socket.sendall(message.encode())
+
+                        if file_data:   #for file sharing: send the file data
+                            client_socket.sendall(file_data)
                     except:
                         pass
+        
 
 
 def getGroup():
