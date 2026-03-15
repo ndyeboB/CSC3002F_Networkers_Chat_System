@@ -129,7 +129,7 @@ def server_listening(client, username): # responsible of collecting the message
                 else:
                     client.sendall(f"ACK:You are already in the group {groupname}".encode())
                 
-                    client.sendall(f"ERROR:You are already in the group".encode())
+                    client.sendall("ERROR:You are already in the group".encode())
 
         elif message.startswith("EXIT_GROUP:"):
             _,groupname = message.split(":",1)
@@ -190,7 +190,7 @@ def server_listening(client, username): # responsible of collecting the message
                 file_data += chunk
 
             # forward the file_data to group members
-            send_to_default_group(message, file_data)
+            send_to_group(message, groupname, file_data)
 
         #Choice 7: The user leaves the whole chat system 
         elif message.startswith("EXIT_CHAT_SYSTEM"):
@@ -225,10 +225,24 @@ def lets_send_message_to_everyone(message, exclude_username=None):
                 except:
                     pass
 
-def send_to_group(message, groupName):
+def send_to_group(message, groupName, file_data=None):
     groups= getGroup()
     if groupName in groups.keys():
         members = groups[groupName]
+    for group, members in groups:
+        #look for specified group
+        if groupName in group:
+            for user in members:
+                for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
+                    if user == username:
+                        try:
+                            client_socket.sendall(message.encode())
+
+                            if file_data:   #for file sharing: send the file data
+                                client_socket.sendall(file_data)
+                                  
+                        except:
+                            pass
 
         for member in members:
             for username, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:

@@ -60,18 +60,15 @@ def listening_For_Messages(client):
                          print(f"\nFile received and saved to: {filepath}")
 
                
-
                else:
-                    server_msg_queue.put(message)
-                    # parts = message.split(":",1)
-
-                    # if len(parts) ==2:
-                    #      print(f"\n[{parts[0]}]: {parts[1]}")
-                    #      print("\n", end="", flush=True) # not a threading problem but a prompting problem
-                    # else:
+                    parts = message.split(":",1)
+                    if len(parts) ==2:
+                         print(f"\n[{parts[0]}]: {parts[1]}")
+                         print("\n", end="", flush=True) # not a threading problem but a prompting problem
+                    else:
                          
-                    #      print(f"\n{message}")
-                    #      print("\n", end="", flush=True)
+                         print(f"\n{message}")
+                         print("\n", end="", flush=True)
                              
                
           except Exception as e:
@@ -250,7 +247,7 @@ def peer_chat(p2p_socket, stop_event):
                     
           except:
                
-               print(f"\nTalk soon!.")
+               print(f"\nTalk soon! Type 'quit'!.")
                stop_event.set() #new change
                break
 
@@ -291,7 +288,7 @@ def interface_menu(client, p2p_socket, username):
                     print("ERROR:No response from server (timeout). Try again")
                     continue
 
-               if response.startsWith("ERROR"):
+               if response.startswith("ERROR"):
                     print(response)
                     continue
 
@@ -415,7 +412,7 @@ def interface_menu(client, p2p_socket, username):
      
           # ACCEPT INCOMING PEER CONN
           # INCOMING CONN IS HANDLED HERE ON THE MAIN THREAD SO THERE IS ONLY EVER ONE INPUT() AT A TIME
-          elif choice == "8.":
+          elif choice == "8":
                try:
                     peer, peer_name = incoming_peer_queue.get_nowait()
                     handle_a_peer_chat(peer, username, peer_name=peer_name, send_handshake=False)
@@ -579,7 +576,7 @@ def main():
                     incoming_peer_queue.put((peer, peer_name))
 
                     print(f"\n***{peer_name} wants to start a chat with you! \nIncoming connection with peer: {address[0]} {address[1]}...")  
-                    print("Type '5' to accept the invitation.\n")
+                    print("Type '8' to accept the invitation.\n")
                     # new change
                     print("Choose your action: ", end="", flush=True)                       
                     #handle_a_peer_chat(peer, CURRENT_USERNAME, peer_name=peer_name) # we start the full peer session without a thread so that it runs on the main thread
