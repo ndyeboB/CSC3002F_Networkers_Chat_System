@@ -156,7 +156,7 @@ def server_listening(client, username): # responsible of collecting the message
                 for user, sock, ip, port,udp_port in CHAT_SERVER.online_clients:
                     if user in CHAT_SERVER.groups[groupname]:
                         try:
-                            sock.sendall(f"<{groupname}>:{username}: {text}".encode())
+                            sock.sendall(f"<{groupname}>\n{username}: {text}".encode())
                         except:
                             pass     
             except:
@@ -198,7 +198,7 @@ def server_listening(client, username): # responsible of collecting the message
 
             for user, client_socket, ip, peer_port, udp_port in CHAT_SERVER.online_clients:
                 if user == username:
-                    CHAT_SERVER.online_clients.remove((user, client_socket, ip, peer_port))
+                    CHAT_SERVER.online_clients.remove((user, client_socket, ip, peer_port, udp_port))
                     break
 
             for members in CHAT_SERVER.groups.values():

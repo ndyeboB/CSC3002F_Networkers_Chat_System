@@ -386,11 +386,11 @@ def interface_menu(client, p2p_socket, username):
                     if message !="":
                          client.sendall(f"GROUP_MSG:{group}:{message}".encode())
                
-               try:
-                    response = server_msg_queue.get(timeout=5)
-                    print(response)
-               except queue.Empty:
-                    print("ERROR:No response from server")
+               # #try:
+               #      #response = server_msg_queue.get(timeout=5)
+               #      #print(response)
+               # except queue.Empty:
+               #      print("ERROR:No response from server")
 
 
           #all the client to exit the specified group
