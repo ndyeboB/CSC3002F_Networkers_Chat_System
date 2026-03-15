@@ -1,10 +1,8 @@
-
-
 import socket
 import threading
 import queue
 import json
-from CHAT_SERVER import CHAT_SERVER
+import CHAT_SERVER
 import os
 import time
 
@@ -33,9 +31,11 @@ def listening_For_Messages(client):
                message = client.recv(2048).decode('utf-8')
                if message == '':
                     continue
-               if isinstance(message, str):
-                    if (message.startswith("ACK:") or message.startswith("ERROR:")): 
+               if (isinstance(message, str)):
+                    if (message.startswith("ACK:") or message.startswith("ERROR:")):
                          server_msg_queue.put(message)
+                    else:
+                         print(message) 
 
                elif isinstance(message, bytes) and message.startswith("["):
                     server_msg_queue.put(message)
@@ -59,16 +59,19 @@ def listening_For_Messages(client):
                               current_bytes += len(chunk)
                          print(f"\nFile received and saved to: {filepath}")
 
-               else:
-                    parts = message.split(":",1)
+               
 
-                    if len(parts) ==2:
-                         print(f"\n[{parts[0]}]: {parts[1]}")
-                         print("\n", end="", flush=True) # not a threading problem but a prompting problem
-                    else:
-                         print("are u the culprit?")
-                         print(f"\n{message}")
-                         print("\n", end="", flush=True)
+               else:
+                    server_msg_queue.put(message)
+                    # parts = message.split(":",1)
+
+                    # if len(parts) ==2:
+                    #      print(f"\n[{parts[0]}]: {parts[1]}")
+                    #      print("\n", end="", flush=True) # not a threading problem but a prompting problem
+                    # else:
+                         
+                    #      print(f"\n{message}")
+                    #      print("\n", end="", flush=True)
                              
                
           except Exception as e:
@@ -345,8 +348,10 @@ def interface_menu(client, p2p_socket, username):
                try:
                     response = server_msg_queue.get(timeout=5)
                     print(response)
+
                except queue.Empty:
                     print("ERROR:No response from server")
+             
 
           #send to the server to continue with add the member to the group   
           elif choice=="4":
@@ -420,8 +425,6 @@ def interface_menu(client, p2p_socket, username):
           else:
                print("Invalid choice!")
                continue
-
-          
 
           
 def send_group_message(client):
