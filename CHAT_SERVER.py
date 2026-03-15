@@ -1,13 +1,4 @@
-# ============================================================
-# CHAT_SERVER.py  —  Networkers Chat  (Stage 3)
-# Bugs fixed:
-#   - Removed stale EXITING/default-group handler
-#   - Fixed FILE: handler (groupname was undefined → crash)
-#   - Removed duplicate EXIT_GROUP handler
-#   - Fixed JOIN_GROUP sending both ACK and ERROR at once
-#   - Fixed EXIT_CHAT_SYSTEM mutating list mid-loop
-#   - Added SO_REUSEADDR for dev convenience
-# ============================================================
+
 
 import socket
 import threading
@@ -21,12 +12,12 @@ udp_socket_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
 class CHAT_SERVER:
-    online_clients = []   # tuples: (username, tcp_socket, ip, p2p_tcp_port, udp_port)
+    online_clients = []   # (username, tcp_socket, ip, p2p_tcp_port, udp_port)
     groups         = {}   # { groupname: [username, ...] }
-    lock           = threading.Lock()   # protects shared state across threads
+    lock           = threading.Lock()   # this protects shared state across threads
 
 
-# ── Broadcast helpers ─────────────────────────────────────────────────────────
+
 
 def lets_send_message_to_everyone(message, exclude_username=None):
     with CHAT_SERVER.lock:
@@ -40,7 +31,7 @@ def lets_send_message_to_everyone(message, exclude_username=None):
 
 
 def send_to_group(message, groupName, file_data=None):
-    """Send a text message (and optional binary file payload) to every group member."""
+    #Send a text message (and optional binary file payload) to every group member
     with CHAT_SERVER.lock:
         members  = list(CHAT_SERVER.groups.get(groupName, []))
         snapshot = list(CHAT_SERVER.online_clients)
@@ -54,7 +45,6 @@ def send_to_group(message, groupName, file_data=None):
                 pass
 
 
-# ── Per-client listener ───────────────────────────────────────────────────────
 
 def work_with_client(client, username):
     threading.Thread(target=server_listening, args=(client, username), daemon=True).start()
@@ -72,7 +62,8 @@ def server_listening(client, username):
         if not message:
             continue
 
-        # ── GET_PEER:<target>  →  peer-to-peer signalling ─────────────────
+       
+        # this is where we do peer-to-peer signalling
         if message.startswith("GET_PEER:"):
             _, target = message.split(":", 1)
             peer_ip = peer_port_found = None
@@ -86,13 +77,13 @@ def server_listening(client, username):
             else:
                 client.sendall(f"ERROR:User '{target}' not found".encode())
 
-        # ── LIST_USERS ─────────────────────────────────────────────────────
+        # listing of the users
         elif message == "LIST_USERS":
             with CHAT_SERVER.lock:
                 users = [u[0] for u in CHAT_SERVER.online_clients]
             client.sendall(f"ACK:LIST_USERS:{','.join(users)}".encode())
 
-        # ── CREATE_GROUP:<groupname>:<members>:<creator> ───────────────────
+        # the CREATE_GROUP functionality --> <groupname>:<members>:<creator> 
         elif message.startswith("CREATE_GROUP:"):
             parts = message.split(":", 3)
             if len(parts) < 4:
@@ -113,7 +104,7 @@ def server_listening(client, username):
             client.sendall(f"ACK:Group '{groupname}' created successfully".encode())
             print(f"[SERVER] Group '{groupname}' created: {all_members}")
 
-        # ── JOIN_GROUP:<groupname>:<username> ──────────────────────────────
+        # the JOIN_GROUP functionality --> <groupname>:<username> 
         elif message.startswith("JOIN_GROUP:"):
             parts = message.split(":", 2)
             if len(parts) < 3:
@@ -133,7 +124,7 @@ def server_listening(client, username):
             send_to_group(f"SERVER:{new_member} joined '{groupname}'", groupname)
             client.sendall(f"ACK:Joined '{groupname}' successfully".encode())
 
-        # ── EXIT_GROUP:<groupname> ─────────────────────────────────────────
+        # the EXIT_GROUP functionality :<groupname> 
         elif message.startswith("EXIT_GROUP:"):
             _, groupname = message.split(":", 1)
             with CHAT_SERVER.lock:
@@ -148,7 +139,7 @@ def server_listening(client, username):
             send_to_group(f"SERVER:{username} left '{groupname}'", groupname)
             client.sendall(f"ACK:Exited '{groupname}'".encode())
 
-        # ── GROUP_MSG:<groupname>:<text> ───────────────────────────────────
+        #  GROUP_MSG --> <groupname>:<text> 
         elif message.startswith("GROUP_MSG:"):
             try:
                 _, groupname, text = message.split(":", 2)
@@ -163,9 +154,8 @@ def server_listening(client, username):
             except ValueError:
                 client.sendall("ERROR:Invalid GROUP_MSG format".encode())
 
-        # ── FILE:<groupname>:<filename>:<filesize> ─────────────────────────
-        # BUG FIX: groupname was previously undefined — now parsed from the header.
-        # Protocol: client sends  FILE:groupname:filename:filesize  then raw bytes.
+        # the FILE sharing functionality --> <groupname>:<filename>:<filesize> 
+       
         elif message.startswith("FILE:"):
             try:
                 parts = message.split(":", 3)
@@ -183,7 +173,7 @@ def server_listening(client, username):
                         client.sendall(f"ERROR:You are not in '{groupname}'".encode())
                         continue
 
-                # Read exact filesize bytes off the TCP stream
+                # read exact filesize bytes off the TCP stream
                 file_data = b""
                 while len(file_data) < filesize:
                     chunk = client.recv(min(4096, filesize - len(file_data)))
@@ -191,27 +181,27 @@ def server_listening(client, username):
                         break
                     file_data += chunk
 
-                # Forward header + bytes to every group member
+                # forward header + bytes to every group member
                 send_to_group(message, groupname, file_data)
                 client.sendall(f"ACK:File '{filename}' sent to '{groupname}'".encode())
 
             except Exception as e:
                 client.sendall(f"ERROR:File transfer failed — {e}".encode())
 
-        # ── EXIT_CHAT_SYSTEM ───────────────────────────────────────────────
+        # EXIT_CHAT_SYSTEM ─functionality
         elif message.startswith("EXIT_CHAT_SYSTEM"):
             client.sendall("ACK:Goodbye!".encode())
-            # BUG FIX: _cleanup_user builds a new list instead of mutating mid-loop
+            # _cleanup_user  assosts in building a new list instead of mutating mid-loop
             _cleanup_user(client, username)
             break
 
-        # ── Unknown command ────────────────────────────────────────────────
+       
         else:
             client.sendall("ERROR:Unknown command".encode())
 
 
 def _cleanup_user(client_sock, username):
-    """Remove a user from all server state and notify everyone."""
+    # remove a user from all server state and notify everyone
     with CHAT_SERVER.lock:
         CHAT_SERVER.online_clients = [
             u for u in CHAT_SERVER.online_clients if u[0] != username
@@ -226,7 +216,7 @@ def _cleanup_user(client_sock, username):
         pass
 
 
-# ── UDP typing-indicator relay ────────────────────────────────────────────────
+
 
 def listening_for_theUDP():
     """Listen for typing-indicator packets from clients and forward them."""
@@ -244,7 +234,7 @@ def listening_for_theUDP():
 
 
 def pass_notification(event, sender, target):
-    """Forward a typing notification to the target peer or group members."""
+    #forward a typing notification to the target peer or group members.
     with CHAT_SERVER.lock:
         snapshot = list(CHAT_SERVER.online_clients)
         groups   = dict(CHAT_SERVER.groups)
@@ -259,14 +249,14 @@ def pass_notification(event, sender, target):
             except Exception:
                 pass
         elif target in groups and username in groups[target]:
-            # Group notification — send to every other member
+            # group notification — send to every other member
             try:
                 udp_socket_server.sendto(f"{event}:{sender}".encode(), (ip, udp_port))
             except Exception:
                 pass
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+
 
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
